@@ -15,7 +15,7 @@ A simple digital banking platform with event-driven microservices architecture. 
 - Ledger Service:
   - Description: single source of trust, append only list of transactions with double entry accounting and idempotency.
   - Database tables: ledger, ledger_events(outbox)
-  - Lambda functions: ledger_service
+  - Lambda functions: LedgerServiceCommandFunction
   - Commands Received: DEPOSIT_CMD, WITHDRAW_CMD
   - Commands Sent: N/A
   - Events Emitted: DEPOSIT_EVENT, WITHDRAW_EVENT, WITHDRAW_FAILED_EVENT
@@ -24,7 +24,7 @@ A simple digital banking platform with event-driven microservices architecture. 
 - Accounts Service:
   - Description: account informations
   - Database tables: accounts, accounts_events(outbox)
-  - Lambda functions: accounts_service
+  - Lambda functions: AccountsServiceHttpFunction
   - Commands Received: N/A
   - Commands Sent: N/A
   - Events Emitted: CREATE_ACCOUNT_EVENT, CLOSE_ACCOUNT_EVENT
@@ -37,7 +37,7 @@ A simple digital banking platform with event-driven microservices architecture. 
 - Query Service: 
   - Description: For reading/queriying balances and transactions histories
   - Database tables: transactions, balances, accounts_projection
-  - Lambda functions: query_service
+  - Lambda functions: QueryServiceHttpFunction, QueryServiceEventFunction
   - Commands Received: N/A
   - Commands Sent: N/A
   - Events Emitted: N/A
@@ -49,7 +49,7 @@ A simple digital banking platform with event-driven microservices architecture. 
 - Banking Service: service to handle user operations
   - Description: service to handle user operations
   - Database tables: operations, operations_events(outbox), accounts_projection
-  - Lambda functions: banking_service
+  - Lambda functions: BankingServiceHttpFunction, BankingServiceEventFunction
   - Commands Received: N/A
   - Commands Sent: DEPOSIT_CMD, WITHDRAW_CMD
   - Events Emitted: N/A
@@ -61,7 +61,7 @@ A simple digital banking platform with event-driven microservices architecture. 
 - Notifications: (won't be implemented)
   - Description: notifications to users via email, sms, etc.
   - Database tables: notifications
-  - Lambda functions: notifications_service
+  - Lambda functions: NotificationsServiceEventFunction
   - Commands Received: N/A
   - Commands Sent: N/A
   - Events Emitted: N/A
@@ -154,6 +154,8 @@ Localstack isn't preferred as it's both costly and heavy for this project.
 - Turborepo
 - Powertools
 - Typescript
+- Middy
+- InversifyJS
 - Jest
 - ESLint + Prettier
 

@@ -1,0 +1,16 @@
+{
+  "name": "@digital-banking/commands",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src --ext .ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@digital-banking/models": "1.0.0"
+  },
+  "devDependencies": {}
+}

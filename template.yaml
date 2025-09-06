@@ -229,11 +229,11 @@ Resources:
 
   # Lambda Functions
   # Ledger Service Lambda
-  LedgerServiceFunction:
+  LedgerCommandHandlerFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/ledger/dist
-      Handler: index.handler
+      Handler: command.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref LedgerTable
@@ -249,18 +249,22 @@ Resources:
           Properties:
             Queue: !GetAtt DepositCommandQueue.Arn
             BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
         WithdrawCommandEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt WithdrawCommandQueue.Arn
             BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
   # Accounts Service Lambda
-  AccountsServiceFunction:
+  AccountsHttpHandlerFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/accounts/dist
-      Handler: index.handler
+      Handler: http.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref AccountsTable
@@ -292,12 +296,12 @@ Resources:
             Path: /accounts
             Method: get
 
-  # Query Service Lambda
-  QueryServiceFunction:
+  # Query Service Lambdas
+  QueryHttpHandlerFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/query/dist
-      Handler: index.handler
+      Handler: http.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TransactionsTable
@@ -305,14 +309,7 @@ Resources:
             TableName: !Ref BalancesTable
         - DynamoDBCrudPolicy:
             TableName: !Ref AccountsProjectionTable
-        - SQSPollerPolicy:
-            QueueName: !GetAtt EventsQueue.QueueName
       Events:
-        EventsEvent:
-          Type: SQS
-          Properties:
-            Queue: !GetAtt EventsQueue.Arn
-            BatchSize: 10
         GetTransactions:
           Type: Api
           Properties:
@@ -331,13 +328,36 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /balances
             Method: get
+            
+  QueryEventHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: services/query/dist
+      Handler: event.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TransactionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BalancesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsProjectionTable
+        - SQSPollerPolicy:
+            QueueName: !GetAtt EventsQueue.QueueName
+      Events:
+        EventsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EventsQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
-  # Banking Service Lambda
-  BankingServiceFunction:
+  # Banking Service Lambdas
+  BankingHttpHandlerFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/banking/dist
-      Handler: index.handler
+      Handler: http.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref OperationsTable
@@ -349,14 +369,7 @@ Resources:
             QueueName: !GetAtt DepositCommandQueue.QueueName
         - SQSSendMessagePolicy:
             QueueName: !GetAtt WithdrawCommandQueue.QueueName
-        - SQSPollerPolicy:
-            QueueName: !GetAtt EventsQueue.QueueName
       Events:
-        EventsEvent:
-          Type: SQS
-          Properties:
-            Queue: !GetAtt EventsQueue.Arn
-            BatchSize: 10
         Deposit:
           Type: Api
           Properties:
@@ -375,6 +388,29 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /operation-status/{operation_id}
             Method: get
+            
+  BankingEventHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: services/banking/dist
+      Handler: event.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OperationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OperationsEventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsProjectionTable
+        - SQSPollerPolicy:
+            QueueName: !GetAtt EventsQueue.QueueName
+      Events:
+        EventsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EventsQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
 Outputs:
   ApiEndpoint:
