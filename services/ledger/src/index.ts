@@ -1,1 +1,1 @@
-export { handler } from './lambdas/command-handler';
+export { commandFunctionHandler } from './lambdas/command-function';

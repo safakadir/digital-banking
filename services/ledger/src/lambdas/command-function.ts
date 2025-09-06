@@ -2,23 +2,29 @@ import { SQSEvent, SQSRecord } from 'aws-lambda';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Metrics } from '@aws-lambda-powertools/metrics';
 import { Tracer } from '@aws-lambda-powertools/tracer';
-import { LedgerService } from '../services/ledger-service';
+import { LedgerService, createLedgerService } from '../services';
 import { commonEventMiddleware } from '@digital-banking/middleware';
 import { BankingCommand } from '@digital-banking/commands';
 
-// Powertools
-const logger = new Logger();
-const tracer = new Tracer();
-const metrics = new Metrics();
-
-// Services
-const ledgerService = new LedgerService();
-
 /**
- * Processes deposit and withdraw commands from SQS
- * Returns batchItemFailures for failed records to enable partial batch processing
+ * Creates a command handler with dependency injection support
+ * @param ledgerService - LedgerService instance
+ * @param logger - Logger instance
+ * @param tracer - Tracer instance
+ * @param metrics - Metrics instance
+ * @returns Command handler function
  */
-export const commandHandler = async (event: SQSEvent): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
+export function createCommandFunctionHandler(
+  ledgerService = createLedgerService(),
+  logger = new Logger(),
+  tracer = new Tracer(),
+  metrics = new Metrics()
+) {
+  /**
+   * Processes deposit and withdraw commands from SQS
+   * Returns batchItemFailures for failed records to enable partial batch processing
+   */
+  const commandHandler = async (event: SQSEvent): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
   logger.info('Processing ledger commands', { recordCount: event.Records.length });
   
   const batchItemFailures: { itemIdentifier: string }[] = [];
@@ -61,4 +67,9 @@ async function processRecord(record: SQSRecord): Promise<void> {
   }
 }
 
-export const handler = commonEventMiddleware(commandHandler, logger, tracer, metrics);
+  // Return the handler with middleware
+  return commonEventMiddleware(commandHandler, logger, tracer, metrics);
+}
+
+// Export the default handler instance
+export const commandFunctionHandler = createCommandFunctionHandler();

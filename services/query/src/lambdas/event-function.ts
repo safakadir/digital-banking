@@ -2,24 +2,31 @@ import { SQSEvent, SQSRecord } from 'aws-lambda';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Metrics } from '@aws-lambda-powertools/metrics';
 import { Tracer } from '@aws-lambda-powertools/tracer';
+import middy from '@middy/core';
 import { commonEventMiddleware } from '@digital-banking/middleware';
-import { BankingService } from '../services/banking-service';
+import { QueryService, createQueryService } from '../services';
 import { BankingEvent } from '@digital-banking/events';
 
-// Powertools
-const logger = new Logger();
-const tracer = new Tracer();
-const metrics = new Metrics();
-
-// Services
-const bankingService = new BankingService();
-
 /**
- * Processes events for the Banking service
- * Returns batchItemFailures for failed records to enable partial batch processing
+ * Creates an event handler with dependency injection support
+ * @param queryService - QueryService instance
+ * @param logger - Logger instance
+ * @param tracer - Tracer instance
+ * @param metrics - Metrics instance
+ * @returns Event handler function
  */
-export const eventHandler = async (event: SQSEvent): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
-  logger.info('Processing banking events', { recordCount: event.Records.length });
+export function createEventFunctionHandler(
+  queryService = createQueryService(),
+  logger = new Logger(),
+  tracer = new Tracer(),
+  metrics = new Metrics()
+) {
+  /**
+   * Processes events for the Query service
+   * Returns batchItemFailures for failed records to enable partial batch processing
+   */
+  const eventHandler = async (event: SQSEvent): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
+  logger.info('Processing query events', { recordCount: event.Records.length });
   
   const batchItemFailures: { itemIdentifier: string }[] = [];
   
@@ -45,19 +52,19 @@ async function processRecord(record: SQSRecord): Promise<void> {
     
     switch (message.type) {
       case 'DEPOSIT_EVENT':
-        await bankingService.processDepositEvent(message);
+        await queryService.processDepositEvent(message);
         break;
       case 'WITHDRAW_EVENT':
-        await bankingService.processWithdrawEvent(message);
+        await queryService.processWithdrawEvent(message);
         break;
       case 'WITHDRAW_FAILED_EVENT':
-        await bankingService.processWithdrawFailedEvent(message);
+        await queryService.processWithdrawFailedEvent(message);
         break;
       case 'CREATE_ACCOUNT_EVENT':
-        await bankingService.processCreateAccountEvent(message);
+        await queryService.processCreateAccountEvent(message);
         break;
       case 'CLOSE_ACCOUNT_EVENT':
-        await bankingService.processCloseAccountEvent(message);
+        await queryService.processCloseAccountEvent(message);
         break;
       default:
         // Exhaustive check to ensure all event types are handled
@@ -70,5 +77,11 @@ async function processRecord(record: SQSRecord): Promise<void> {
   }
 }
 
-// Export the handler with middleware
-export const handler = commonEventMiddleware(eventHandler, logger, tracer, metrics);
+  // Using switch-case with discriminated union for type-safety
+  
+  // Return the handler with middleware
+  return commonEventMiddleware(eventHandler, logger, tracer, metrics);
+}
+
+// Export the default handler instance
+export const eventFunctionHandler = createEventFunctionHandler();

@@ -3,18 +3,23 @@ import { Metrics } from '@aws-lambda-powertools/metrics';
 import { Tracer } from '@aws-lambda-powertools/tracer';
 import httpRouter from '@middy/http-router';
 import { commonApiMiddleware } from '@digital-banking/middleware';
-import { AccountService } from '../services/account-service';
+import { createAccountService } from '../services';
 
-// Powertools
-const logger = new Logger();
-const tracer = new Tracer();
-const metrics = new Metrics();
-
-// Service instance
-const accountService = new AccountService();
-
-// Define routes with http-router
-export const apiHandler = httpRouter([
+/**
+ * Creates an API handler with dependency injection support
+ * @param queryService - QueryService instance
+ * @param logger - Logger instance
+ * @param tracer - Tracer instance
+ * @param metrics - Metrics instance
+ * @returns HTTP router handler
+ */
+export function createApiFunctionHandler(
+  accountService = createAccountService(),
+  logger = new Logger(),
+  tracer = new Tracer(),
+  metrics = new Metrics()
+) {
+  return httpRouter([
   {
     method: 'POST',
     path: '/accounts',
@@ -141,4 +146,7 @@ export const apiHandler = httpRouter([
       }
     }, logger, tracer, metrics)
   }
-]);
+])};
+
+// Export the default handler instance
+export const apiFunctionHandler = createApiFunctionHandler();

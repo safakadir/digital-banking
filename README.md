@@ -76,12 +76,18 @@ This project follows an event-driven microservices architecture with the followi
 - **Notifications Service**: For sending notifications (not implemented)
 
 ### Architectural Concepts 
+
 - Event-driven architecture
 - Microservices architecture
 - Outbox pattern: Handled by DynamoDB Streams
 - Inbox pattern: Handled by Powertools's IdempotentHandler
 - CQRS: Commands and Queries are separated
 - Event Sourcing: Append-only transactions
+
+N-Tier Architecture vs. Onion Architecture:
+- For the sake of simplicity and for avoiding boilerplate, N-Tier Architecture is used for this assignment.
+- But it can be transformed to Onion Architecture with some refactoring later, if needed with incoming complexity.
+- Handlers are provided inline in entry points(lambdas) as they're simple and straightforward. They can be extracted to separate files if needed.
 
 ## Technologies Used
 

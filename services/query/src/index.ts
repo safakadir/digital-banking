@@ -1,2 +1,2 @@
-export { apiHandler } from './lambdas/api-handler';
-export { eventHandler } from './lambdas/event-handler';
+export { apiFunctionHandler } from './lambdas/api-function';
+export { eventFunctionHandler } from './lambdas/event-function';

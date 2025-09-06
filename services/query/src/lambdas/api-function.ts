@@ -1,21 +1,25 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Metrics } from '@aws-lambda-powertools/metrics';
 import { Tracer } from '@aws-lambda-powertools/tracer';
 import httpRouter from '@middy/http-router';
-import { QueryService } from '../services/query-service';
+import { createQueryService } from '../services';
 import { commonApiMiddleware } from '@digital-banking/middleware';
 
-// Powertools
-const logger = new Logger();
-const tracer = new Tracer();
-const metrics = new Metrics();
-
-// Service instance
-const queryService = new QueryService();
-
-// Define routes with http-router
-export const apiHandler = httpRouter([
+/**
+ * Creates an API handler with dependency injection support
+ * @param queryService - QueryService instance
+ * @param logger - Logger instance
+ * @param tracer - Tracer instance
+ * @param metrics - Metrics instance
+ * @returns HTTP router handler
+ */
+export function createApiFunctionHandler(
+  queryService = createQueryService(),
+  logger = new Logger(),
+  tracer = new Tracer(),
+  metrics = new Metrics()
+) {
+  return httpRouter([
   {
     method: 'GET',
     path: '/transactions/{account_id}',
@@ -106,4 +110,8 @@ export const apiHandler = httpRouter([
       }
     }, logger, tracer, metrics)
   }
-]);
+  ]);
+}
+
+// Export the default handler instance
+export const apiFunctionHandler = createApiFunctionHandler();

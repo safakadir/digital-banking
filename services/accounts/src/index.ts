@@ -1,1 +1,1 @@
-export { apiHandler } from './lambdas/api-handler';
+export { apiFunctionHandler } from './lambdas/api-function';
