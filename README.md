@@ -22,6 +22,9 @@ digital-banking/
 └── turbo.json          # Turborepo configuration
 ```
 
+It's a monorepo project managed by turborepo.
+Since it's a monorepo, SAM templates will be placed in the root folder as central template for ease of use.
+
 ## Prerequisites
 
 - Node.js 18+
@@ -71,6 +74,14 @@ This project follows an event-driven microservices architecture with the followi
 - **Accounts Service**: Manages account information
 - **Query Service**: For reading/querying balances and transaction histories
 - **Notifications Service**: For sending notifications (not implemented)
+
+### Architectural Concepts 
+- Event-driven architecture
+- Microservices architecture
+- Outbox pattern: Handled by DynamoDB Streams
+- Inbox pattern: Handled by Powertools's IdempotentHandler
+- CQRS: Commands and Queries are separated
+- Event Sourcing: Append-only transactions
 
 ## Technologies Used
 

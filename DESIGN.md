@@ -109,12 +109,16 @@ Client /accounts --> APIGW --> Accounts Service --CLOSE_ACCOUNT_EVENT(with outbo
 
 ## Orchestration:
 
-SAM templates will handle the orchestration in a full AWS environment.
-For local developent, we cannot set up full ecosystem locally. sam local start-api will just start the lambdas and emulates APIGW basically. We can also get up dynamodb-local in container locally. Lambdas can be triggered manually but full event driven scenario cannot be achieved.
-Localstack would be an option but it's both costly and heavy for this project.
-All outgoing messages will be written to outbox tables in DynamoDB, then DynamoDB Streams will complete the outbox pattern and trigger the lambdas. Triggering lambdas by event is not available in local environment.
-Full end to end scenario is on AWS environment, which is provided.
-Since it's monorepo, SAM templates will be placed in the root folder as central template.
+### AWS environment: 
+SAM template will manage all required resources and handle the orchestration in a full AWS environment. 
+
+### Local environment:
+`sam local start-api` + `dynamodb-local` + `elasticmq` + `docker-compose`
+
+For local developent, we cannot set up full ecosystem locally. sam local start-api will just start the lambdas and emulates APIGW basically. We can also get up dynamodb-local and elasticmq in replace of SQS in containers locally. Lambdas can be triggered manually and invoked individually, but full event driven scenario cannot be achieved.
+
+Localstack isn't preferred as it's both costly and heavy for this project.
+
 
 ## Crosscutting Concerns:
 
