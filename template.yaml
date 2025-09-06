@@ -1,0 +1,388 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Digital Banking Platform with Event-Driven Microservices
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs18.x
+    MemorySize: 256
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        NODE_OPTIONS: --enable-source-maps
+        LOG_LEVEL: INFO
+        POWERTOOLS_SERVICE_NAME: !Ref AWS::StackName
+        POWERTOOLS_LOGGER_LOG_EVENT: 'true'
+        POWERTOOLS_LOGGER_SAMPLE_RATE: 1
+        POWERTOOLS_METRICS_NAMESPACE: !Ref AWS::StackName
+
+Resources:
+  # Cognito User Pool for Authentication
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: DigitalBankingUserPool
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: DigitalBankingClient
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  # API Gateway
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt UserPool.Arn
+
+  # DynamoDB Tables
+  # Ledger Service Tables
+  LedgerTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ledger
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  LedgerEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ledger_events
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # Accounts Service Tables
+  AccountsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: accounts
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  AccountsEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: accounts_events
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # Query Service Tables
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: transactions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: account_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: account_id
+          KeyType: HASH
+        - AttributeName: id
+          KeyType: RANGE
+
+  BalancesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: balances
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: account_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: account_id
+          KeyType: HASH
+
+  AccountsProjectionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: accounts_projection
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  # Banking Service Tables
+  OperationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: operations
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  OperationsEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: operations_events
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # SQS Queues
+  DepositCommandQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: deposit-command-queue
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DepositCommandDLQ.Arn
+        maxReceiveCount: 3
+
+  DepositCommandDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: deposit-command-dlq
+
+  WithdrawCommandQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: withdraw-command-queue
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt WithdrawCommandDLQ.Arn
+        maxReceiveCount: 3
+
+  WithdrawCommandDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: withdraw-command-dlq
+
+  EventsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: events-queue
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EventsDLQ.Arn
+        maxReceiveCount: 3
+
+  EventsDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: events-dlq
+
+  # Lambda Functions
+  # Ledger Service Lambda
+  LedgerServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: services/ledger/dist
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LedgerTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LedgerEventsTable
+        - SQSPollerPolicy:
+            QueueName: !GetAtt DepositCommandQueue.QueueName
+        - SQSPollerPolicy:
+            QueueName: !GetAtt WithdrawCommandQueue.QueueName
+      Events:
+        DepositCommandEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DepositCommandQueue.Arn
+            BatchSize: 10
+        WithdrawCommandEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt WithdrawCommandQueue.Arn
+            BatchSize: 10
+
+  # Accounts Service Lambda
+  AccountsServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: services/accounts/dist
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsEventsTable
+      Events:
+        CreateAccount:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /accounts
+            Method: post
+        CloseAccount:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /accounts/{account_id}/close
+            Method: post
+        GetAccount:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /accounts/{account_id}
+            Method: get
+        GetAccounts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /accounts
+            Method: get
+
+  # Query Service Lambda
+  QueryServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: services/query/dist
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TransactionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BalancesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsProjectionTable
+        - SQSPollerPolicy:
+            QueueName: !GetAtt EventsQueue.QueueName
+      Events:
+        EventsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EventsQueue.Arn
+            BatchSize: 10
+        GetTransactions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /transactions/{account_id}
+            Method: get
+        GetBalance:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /balances/{account_id}
+            Method: get
+        GetBalances:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /balances
+            Method: get
+
+  # Banking Service Lambda
+  BankingServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: services/banking/dist
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OperationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OperationsEventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AccountsProjectionTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DepositCommandQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt WithdrawCommandQueue.QueueName
+        - SQSPollerPolicy:
+            QueueName: !GetAtt EventsQueue.QueueName
+      Events:
+        EventsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EventsQueue.Arn
+            BatchSize: 10
+        Deposit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /deposit
+            Method: post
+        Withdraw:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /withdraw
+            Method: post
+        GetOperationStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /operation-status/{operation_id}
+            Method: get
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+  UserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: "Cognito User Pool Client ID"
+    Value: !Ref UserPoolClient
