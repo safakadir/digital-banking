@@ -7,7 +7,7 @@
     "build": "tsc",
     "lint": "eslint src --ext .ts",
     "test": "jest",
-    "dev": "tsc -w"
+    "postinstall": "cd ../../shared/utils && npm install && npm run build && cd ../../shared/models && npm install && npm run build"
   },
   "dependencies": {
     "@aws-lambda-powertools/idempotency": "^2.25.2",
