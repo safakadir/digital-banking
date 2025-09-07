@@ -4,7 +4,7 @@ import {
   Account, 
   AccountStatus 
 } from '@digital-banking/models';
-import { CreateAccountRequest } from '../dto';
+import { CreateAccountRequest } from './dto';
 import { 
   CreateAccountEvent, 
   CloseAccountEvent 
@@ -13,7 +13,7 @@ import {
   NotFoundError,
   ConflictError
 } from '@digital-banking/errors';
-import { IAccountRepository } from '../repositories';
+import { IAccountRepository } from './repositories';
 
 // Powertools
 const logger = new Logger();

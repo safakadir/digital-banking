@@ -1,43 +1,19 @@
 import { SQSEvent } from 'aws-lambda';
 import { commonEventMiddleware } from '@digital-banking/middleware';
-import { createBankingService } from '../services';
 import { createDefaultTelemetryBundle } from '@digital-banking/utils';
-import { BankingEvent } from '@digital-banking/events';
-import { depositEventHandler } from './event-handlers/deposit-event-handler';
-import { withdrawSuccessEventHandler } from './event-handlers/withdraw-success-event-handler';
-import { withdrawFailedEventHandler } from './event-handlers/withdraw-failed-event-handler';
-import { createAccountEventHandler } from './event-handlers/create-account-event-handler';
-import { closeAccountEventHandler } from './event-handlers/close-account-event-handler';
-import { IdempotencyConfig, makeIdempotent } from '@aws-lambda-powertools/idempotency';
-import { DynamoDBPersistenceLayer } from '@aws-lambda-powertools/idempotency/dynamodb';
-
-// Configure idempotency
-const persistenceStore = new DynamoDBPersistenceLayer({
-  tableName: process.env.IDEMPOTENCY_TABLE || 'BankingSvc-EventFn-Idempotency-dev',
-});
-
-const idempotencyConfig = new IdempotencyConfig({
-  // Use message ID as the idempotency key (extracting from various message formats)
-  eventKeyJmesPath: `
-    Records[*].body | 
-    fromjson(@).Type == 'Notification' ? 
-      (fromjson(fromjson(@).Message).id ? 
-        fromjson(fromjson(@).Message).id : 
-        fromjson(fromjson(@).Message).eventData.id) : 
-      fromjson(@).id
-  `,
-  // TTL for idempotency records (24 hours)
-  expiresAfterSeconds: 86400,
-});
+import { BankingEvent, CloseAccountEvent, CreateAccountEvent, DepositEvent, WithdrawFailedEvent, WithdrawSuccessEvent } from '@digital-banking/events';
+import { DepositEventHandler } from '../event/deposit-event-handler';
+import { WithdrawSuccessEventHandler } from '../event/withdraw-success-event-handler';
+import { WithdrawFailedEventHandler } from '../event/withdraw-failed-event-handler';
+import { CreateAccountEventHandler } from '../event/create-account-event-handler';
+import { CloseAccountEventHandler } from '../event/close-account-event-handler';
 
 /**
  * Creates an event handler with dependency injection support
- * @param bankingService - BankingService instance
  * @param telemetry - TelemetryBundle instance
  * @returns Event handler function
  */
 export function createEventFunctionHandler(
-  bankingService = createBankingService(),
   telemetry = createDefaultTelemetryBundle()
 ) {
   const { logger } = telemetry;
@@ -88,19 +64,19 @@ export function createEventFunctionHandler(
         
         switch (message.type) {
           case 'DEPOSIT_EVENT':
-            await depositEventHandler(bankingService, telemetry)(message);
+            await new DepositEventHandler(telemetry).handle(message as DepositEvent);
             break;
           case 'WITHDRAW_SUCCESS_EVENT':
-            await withdrawSuccessEventHandler(bankingService, telemetry)(message);
+            await new WithdrawSuccessEventHandler(telemetry).handle(message as WithdrawSuccessEvent);
             break;
           case 'WITHDRAW_FAILED_EVENT':
-            await withdrawFailedEventHandler(bankingService, telemetry)(message);
+            await new WithdrawFailedEventHandler(telemetry).handle(message as WithdrawFailedEvent);
             break;
           case 'CREATE_ACCOUNT_EVENT':
-            await createAccountEventHandler(bankingService, telemetry)(message);
+            await new CreateAccountEventHandler(telemetry).handle(message as CreateAccountEvent);
             break;
           case 'CLOSE_ACCOUNT_EVENT':
-            await closeAccountEventHandler(bankingService, telemetry)(message);
+            await new CloseAccountEventHandler(telemetry).handle(message as CloseAccountEvent);
             break;
           default:
             // Exhaustive check to ensure all event types are handled
@@ -116,14 +92,9 @@ export function createEventFunctionHandler(
     return { batchItemFailures };
   };
   
-  // Make the handler idempotent
-  const idempotentHandler = makeIdempotent(eventHandler, {
-    persistenceStore,
-    config: idempotencyConfig
-  });
-  
   // Return the handler with middleware
-  return commonEventMiddleware(idempotentHandler, telemetry);
+  // Note: Idempotency is now handled by inbox pattern in business logic
+  return commonEventMiddleware(eventHandler, telemetry);
 }
 
 // Export the default handler instance

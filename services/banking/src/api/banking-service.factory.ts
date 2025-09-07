@@ -1,8 +1,6 @@
-import { BankingService } from './banking-service';
-import { 
-  OperationRepository, 
-  AccountsProjectionRepository 
-} from '../repositories/dynamodb';
+import { BankingService } from "./banking-service";
+import { AccountsProjectionRepository } from "./repositories/dynamodb/accounts-projection.repository";
+import { OperationRepository } from "./repositories/dynamodb/operation.repository";
 
 /**
  * Creates a BankingService instance with injected repositories
@@ -17,7 +15,3 @@ export function createBankingService(): BankingService {
   // Inject repositories into service
   return new BankingService(operationRepository, accountsProjectionRepository);
 }
-
-// Export service classes and repositories for direct usage if needed
-export { BankingService };
-export * from '../repositories';

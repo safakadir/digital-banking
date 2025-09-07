@@ -48,49 +48,6 @@ export class OperationRepository implements IOperationRepository {
   }
 
   /**
-   * Update operation status
-   */
-  async updateStatus(
-    operationId: string, 
-    status: 'pending' | 'completed' | 'failed',
-    errorMessage?: string
-  ): Promise<void> {
-    try {
-      const timestamp = new Date().toISOString();
-      
-      const updateParams: any = {
-        TableName: this.tableName,
-        Key: { operationId },
-        UpdateExpression: 'SET #status = :status',
-        ExpressionAttributeNames: {
-          '#status': 'status'
-        },
-        ExpressionAttributeValues: {
-          ':status': status
-        }
-      };
-
-      if (status === 'completed' || status === 'failed') {
-        updateParams.UpdateExpression += ', completedAt = :completedAt';
-        updateParams.ExpressionAttributeValues[':completedAt'] = timestamp;
-      }
-
-      if (errorMessage) {
-        updateParams.UpdateExpression += ', errorMessage = :errorMessage';
-        updateParams.ExpressionAttributeValues[':errorMessage'] = errorMessage;
-      }
-
-      const command = new UpdateCommand(updateParams);
-      await this.dynamoClient.send(command);
-      
-      logger.info('Operation updated', { operationId, status });
-    } catch (error) {
-      logger.error('Error updating operation', { error, operationId, status });
-      throw error;
-    }
-  }
-
-  /**
    * Create operation and send command atomically using outbox pattern
    */
   async createWithCommand(operation: Operation, command: DepositCommand | WithdrawCommand): Promise<void> {

@@ -13,18 +13,6 @@ export interface IOperationRepository {
   getById(operationId: string): Promise<Operation | null>;
 
   /**
-   * Update operation status
-   * @param operationId - Operation ID
-   * @param status - New status
-   * @param errorMessage - Optional error message for failed operations
-   */
-  updateStatus(
-    operationId: string, 
-    status: 'pending' | 'completed' | 'failed',
-    errorMessage?: string
-  ): Promise<void>;
-
-  /**
    * Create operation and send command atomically using outbox pattern
    * @param operation - Operation to create
    * @param command - Command to send via outbox

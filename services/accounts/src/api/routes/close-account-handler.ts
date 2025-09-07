@@ -1,8 +1,8 @@
 import { commonApiMiddleware, validationMiddleware, errorHandlerMiddleware } from "@digital-banking/middleware";
 import { TelemetryBundle } from "@digital-banking/utils";
-import { CloseAccountResponse } from "../../dto";
-import { validateAccountIdParam } from "../../validators";
-import { AccountService } from "../../services";
+import { CloseAccountResponse } from "../dto";
+import { validateAccountIdParam } from "../validators";
+import { AccountService } from "../account-service";
 
 export const closeAccountHandler = (
   accountService: AccountService, 

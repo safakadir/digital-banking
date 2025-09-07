@@ -1,10 +1,10 @@
 import httpRouter from '@middy/http-router';
-import { createAccountService } from '../services';
-import { createAccountHandler } from './api-handlers/create-account-handler';
-import { closeAccountHandler } from './api-handlers/close-account-handler';
-import { getAccountHandler } from './api-handlers/get-account-handler';
-import { getAccountsHandler } from './api-handlers/get-accounts-handler';
 import { createDefaultTelemetryBundle } from '@digital-banking/utils';
+import { createAccountService } from '../api/account-service.factory';
+import { createAccountHandler } from '../api/routes/create-account-handler';
+import { closeAccountHandler } from '../api/routes/close-account-handler';
+import { getAccountHandler } from '../api/routes/get-account-handler';
+import { getAccountsHandler } from '../api/routes/get-accounts-handler';
 
 /**
  * Creates an API handler with dependency injection support

@@ -1,5 +1,6 @@
 import { AccountService } from "./account-service";
-import { AccountRepository } from "../repositories";
+import { AccountRepository } from "./repositories";
+
 
 /**
  * Creates an AccountService instance with its dependencies
@@ -10,6 +11,3 @@ export function createAccountService(): AccountService {
   const accountRepository = new AccountRepository();
   return new AccountService(accountRepository);
 }
-
-// Export service classes for direct usage if needed
-export { AccountService };

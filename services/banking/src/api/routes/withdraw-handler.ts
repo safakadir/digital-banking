@@ -1,8 +1,8 @@
 import { commonApiMiddleware, validationMiddleware, errorHandlerMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
-import { WithdrawResponse } from '../../dto';
-import { BankingService } from '../../services';
-import { validateWithdrawRequest } from '../../validators';
+import { WithdrawResponse } from '../dto';
+import { BankingService } from '../banking-service';
+import { validateWithdrawRequest } from '../validators';
 
 export const withdrawHandler = (
   bankingService: BankingService,

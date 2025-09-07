@@ -1,25 +1,15 @@
 import { Logger } from '@aws-lambda-powertools/logger';
 import { v4 as uuidv4 } from 'uuid';
-import { 
-  DepositEvent, 
-  WithdrawSuccessEvent, 
-  WithdrawFailedEvent, 
-  CreateAccountEvent, 
-  CloseAccountEvent 
-} from '@digital-banking/events';
 import { DepositCommand, WithdrawCommand } from '@digital-banking/commands';
-import { Operation, Account, AccountStatus } from '@digital-banking/models';
+import { Operation } from '@digital-banking/models';
 import { 
   IOperationRepository, 
   IAccountsProjectionRepository 
-} from '../repositories/interfaces';
+} from './repositories/interfaces';
 
 // Powertools
 const logger = new Logger();
 
-/**
- * Banking Service - Business logic for banking operations
- */
 export class BankingService {
   private operationRepository: IOperationRepository;
   private accountsProjectionRepository: IAccountsProjectionRepository;
@@ -28,10 +18,9 @@ export class BankingService {
     operationRepository: IOperationRepository,
     accountsProjectionRepository: IAccountsProjectionRepository
   ) {
-    // Inject repositories
     this.operationRepository = operationRepository;
     this.accountsProjectionRepository = accountsProjectionRepository;
-  }
+  } 
 
   /**
    * Validate that user owns the account
@@ -108,113 +97,6 @@ export class BankingService {
     });
   }
 
-  /**
-   * Update operation status
-   */
-  private async updateOperationStatus(
-    operationId: string, 
-    status: 'pending' | 'completed' | 'failed',
-    errorMessage?: string
-  ): Promise<void> {
-    await this.operationRepository.updateStatus(operationId, status, errorMessage);
-    logger.info('Operation status updated', { operationId, status });
-  }
-
-  /**
-   * Update accounts projection table
-   */
-  private async updateAccountsProjection(accountId: string, userId: string, status: AccountStatus): Promise<void> {
-    const accountProjection = {
-      accountId,
-      userId,
-      status
-    };
-    await this.accountsProjectionRepository.upsert(accountProjection);
-    logger.info('Accounts projection updated', { accountId, userId, status });
-  }
-  /**
-   * Process a deposit event
-   */
-  async processDepositEvent(event: DepositEvent): Promise<void> {
-    logger.info('Processing deposit event in service', { eventId: event.id });
-    
-    try {
-      // 1. Update operation status to COMPLETED
-      await this.updateOperationStatus(event.operationId, 'completed');
-      logger.info('Deposit event processed successfully', { eventId: event.id, operationId: event.operationId });
-    } catch (error) {
-      logger.error('Error processing deposit event', { error, eventId: event.id });
-      throw error;
-    }
-  }
-
-  /**
-   * Process a withdraw success event
-   */
-  async processWithdrawSuccessEvent(event: WithdrawSuccessEvent): Promise<void> {
-    logger.info('Processing withdraw success event in service', { eventId: event.id });
-    
-    try {
-      // 1. Update operation status to COMPLETED
-      await this.updateOperationStatus(event.operationId, 'completed');
-      logger.info('Withdraw success event processed successfully', { eventId: event.id, operationId: event.operationId });
-    } catch (error) {
-      logger.error('Error processing withdraw success event', { error, eventId: event.id });
-      throw error;
-    }
-  }
-
-  /**
-   * Process a withdraw failed event
-   */
-  async processWithdrawFailedEvent(event: WithdrawFailedEvent): Promise<void> {
-    logger.info('Processing withdraw failed event in service', { eventId: event.id });
-    
-    try {
-      // 1. Update operation status to FAILED
-      await this.updateOperationStatus(event.operationId, 'failed', event.reason);
-      logger.info('Withdraw failed event processed successfully', { eventId: event.id, operationId: event.operationId });
-    } catch (error) {
-      logger.error('Error processing withdraw failed event', { error, eventId: event.id });
-      throw error;
-    }
-  }
-
-  /**
-   * Process a create account event
-   */
-  async processCreateAccountEvent(event: CreateAccountEvent): Promise<void> {
-    logger.info('Processing create account event in service', { eventId: event.id });
-    
-    try {
-      // 1. Update accounts projection table with minimal data
-      await this.updateAccountsProjection(event.accountId, event.userId, AccountStatus.ACTIVE);
-      logger.info('Create account event processed successfully', { eventId: event.id, accountId: event.accountId });
-    } catch (error) {
-      logger.error('Error processing create account event', { error, eventId: event.id });
-      throw error;
-    }
-  }
-
-  /**
-   * Process a close account event
-   */
-  async processCloseAccountEvent(event: CloseAccountEvent): Promise<void> {
-    logger.info('Processing close account event in service', { eventId: event.id });
-    
-    try {
-      // 1. Update account status to CLOSED in projection table
-      await this.accountsProjectionRepository.updateStatus(
-        event.accountId, 
-        AccountStatus.CLOSED
-      );
-      
-      logger.info('Close account event processed successfully', { eventId: event.id, accountId: event.accountId });
-    } catch (error) {
-      logger.error('Error processing close account event', { error, eventId: event.id });
-      throw error;
-    }
-  }
   /**
    * Process a deposit request
    */

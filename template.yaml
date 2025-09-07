@@ -69,11 +69,11 @@ Resources:
             UserPoolArn: !GetAtt UserPool.Arn
 
   # DynamoDB Tables
-  # Idempotency Tables
-  LedgerSvcCommandFnIdempotencyTable:
+  # Inbox Tables for Message Deduplication
+  LedgerSvcCommandFnInboxTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "LedgerSvc-CommandFn-Idempotency-${Env}"
+      TableName: !Sub "LedgerSvc-CommandFn-Inbox-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -85,25 +85,25 @@ Resources:
         AttributeName: expiration
         Enabled: true
         
-  BankingSvcEventFnIdempotencyTable:
+  BankingSvcEventFnInboxTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "BankingSvc-EventFn-Idempotency-${Env}"
+      TableName: !Sub "BankingSvc-InboxTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: messageId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: messageId
           KeyType: HASH
       TimeToLiveSpecification:
-        AttributeName: expiration
+        AttributeName: ttl
         Enabled: true
         
-  QuerySvcEventFnIdempotencyTable:
+  QuerySvcEventFnInboxTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "QuerySvc-EventFn-Idempotency-${Env}"
+      TableName: !Sub "QuerySvc-EventFn-Inbox-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -438,7 +438,7 @@ Resources:
       Handler: index.commandFunctionHandler
       Environment:
         Variables:
-          IDEMPOTENCY_TABLE: !Ref LedgerSvcCommandFnIdempotencyTable
+          INBOX_TABLE: !Ref LedgerSvcCommandFnInboxTable
           LEDGER_TABLE_NAME: !Ref LedgerSvcLedgerTable
           OUTBOX_TABLE_NAME: !Ref LedgerSvcOutboxTable
       Policies:
@@ -447,7 +447,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref LedgerSvcOutboxTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref LedgerSvcCommandFnIdempotencyTable
+            TableName: !Ref LedgerSvcCommandFnInboxTable
         - SQSPollerPolicy:
             QueueName: !GetAtt DepositCommandQueue.QueueName
         - SQSPollerPolicy:
@@ -553,7 +553,7 @@ Resources:
       Handler: index.eventFunctionHandler
       Environment:
         Variables:
-          IDEMPOTENCY_TABLE: !Ref QuerySvcEventFnIdempotencyTable
+          INBOX_TABLE: !Ref QuerySvcEventFnInboxTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref QuerySvcTransactionsTable
@@ -562,7 +562,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref QuerySvcAccountsProjectionTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref QuerySvcEventFnIdempotencyTable
+            TableName: !Ref QuerySvcEventFnInboxTable
         - SQSPollerPolicy:
             QueueName: !GetAtt QuerySvcEventQueue.QueueName
       Events:
@@ -625,7 +625,7 @@ Resources:
       Handler: index.eventFunctionHandler
       Environment:
         Variables:
-          IDEMPOTENCY_TABLE: !Ref BankingSvcEventFnIdempotencyTable
+          BANKING_INBOX_TABLE: !Ref BankingSvcEventFnInboxTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref BankingSvcOperationsTable
@@ -634,7 +634,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref BankingSvcAccountsProjectionTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref BankingSvcEventFnIdempotencyTable
+            TableName: !Ref BankingSvcEventFnInboxTable
         - SQSPollerPolicy:
             QueueName: !GetAtt BankingSvcEventQueue.QueueName
       Events:

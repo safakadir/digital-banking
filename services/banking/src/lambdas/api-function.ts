@@ -1,9 +1,9 @@
 import httpRouter from '@middy/http-router';
-import { createBankingService } from '../services';
 import { createDefaultTelemetryBundle } from '@digital-banking/utils';
-import { depositHandler } from './api-handlers/deposit-handler';
-import { withdrawHandler } from './api-handlers/withdraw-handler';
-import { operationHandler } from './api-handlers/operation-handler';
+import { createBankingService } from '../api/banking-service.factory';
+import { depositHandler } from '../api/routes/deposit-handler';
+import { withdrawHandler } from '../api/routes/withdraw-handler';
+import { operationHandler } from '../api/routes/operation-handler';
 
 /**
  * Creates an API handler with dependency injection support
