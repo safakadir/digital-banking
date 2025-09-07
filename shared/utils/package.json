@@ -1,6 +1,7 @@
 {
   "name": "@digital-banking/utils",
   "version": "1.0.0",
+  "type": "module",
   "private": true,
   "main": "dist/index.js",
   "scripts": {
@@ -14,9 +15,10 @@
     "@aws-lambda-powertools/metrics": "^2.25.2",
     "@aws-lambda-powertools/tracer": "^2.25.2",
     "@aws-sdk/client-dynamodb": "^3.523.0",
+    "@aws-sdk/client-sns": "^3.883.0",
     "@aws-sdk/client-sqs": "^3.523.0",
     "@aws-sdk/lib-dynamodb": "^3.523.0",
-    "@digital-banking/events": "1.0.0",
+    "@digital-banking/events": "file:../events",
     "uuid": "^9.0.0"
   },
   "devDependencies": {

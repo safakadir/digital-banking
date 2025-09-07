@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "postbuild": "cp package.json dist/",
     "lint": "eslint src --ext .ts",
-    "test": "jest",
-    "postinstall": "cd ../../shared/utils && npm install && npm run build && cd ../../shared/models && npm install && npm run build"
+    "test": "jest"
   },
   "dependencies": {
     "@aws-lambda-powertools/idempotency": "^2.25.2",
@@ -15,13 +15,14 @@
     "@aws-lambda-powertools/metrics": "^2.25.2",
     "@aws-lambda-powertools/tracer": "^2.25.2",
     "@aws-sdk/client-dynamodb": "^3.523.0",
+    "@aws-sdk/client-sns": "^3.883.0",
     "@aws-sdk/client-sqs": "^3.523.0",
     "@aws-sdk/lib-dynamodb": "^3.523.0",
-    "@digital-banking/constants": "1.0.0",
-    "@digital-banking/events": "1.0.0",
-    "@digital-banking/middleware": "1.0.0",
-    "@digital-banking/models": "1.0.0",
-    "@digital-banking/utils": "1.0.0",
+    "@digital-banking/constants": "file:../../shared/constants",
+    "@digital-banking/events": "file:../../shared/events",
+    "@digital-banking/middleware": "file:../../shared/middleware",
+    "@digital-banking/models": "file:../../shared/models",
+    "@digital-banking/utils": "file:../../shared/utils",
     "@middy/core": "^4.6.5",
     "@middy/http-error-handler": "^4.6.5",
     "@middy/http-header-normalizer": "^4.6.5",

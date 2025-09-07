@@ -71,28 +71,11 @@ A simple digital banking platform with event-driven microservices architecture. 
 
 ## General flows of some API endpoints: 
 
-### Deposit:
-Client /deposit --> APIGW --> Banking Service --DEPOSIT_CMD(with outbox pattern) --> SQS --> Ledger Service --DEPOSIT_EVENT(with outbox pattern)--> SQS --> Query Service 
---Returns 200 ok with status PENDING after writing the command.
+BankingSvcApiFn -> BankingSvcOutboxTable -> dynamodb streams -> event bridge pipes -> DepositCommandQueue | WithdrawCommandQueue -> LedgerScvCommandFn
 
-### Withdraw:
-Client /withdraw --> APIGW --> Banking Service --WITHDRAW_CMD(with outbox pattern) --> SQS --> Ledger Service --WITHDRAW_SUCCESS_EVENT(with outbox pattern)--> SQS --> Query Service
---Returns 200 ok with status PENDING after writing the command.
+LedgerSvcCommandFn -> LedgerSvcOutboxTable -> dynamodb streams -> event bridge pipes -> LedgerEventsTopic -> (BankingSvcEventsQueue -> BankingSvcEventFn | QuerySvcEventsQueue -> QuerySvcEventFn)
 
-### Query Operation Status:
-Client /operation-status --> APIGW --> Banking Service
-
-### Query Balance:
-Client /balance --> APIGW --> Query Service
-
-### Query Transactions:
-Client /transactions --> APIGW --> Query Service
-
-### Create Account:
-Client /accounts --> APIGW --> Accounts Service --CREATE_ACCOUNT_EVENT(with outbox pattern) --> SQS --> Banking Service & Query Service
-
-### Create Account:
-Client /accounts --> APIGW --> Accounts Service --CLOSE_ACCOUNT_EVENT(with outbox pattern) --> SQS --> Banking Service & Query Service
+AccountsSvcApiFn -> AccountsSvcOutboxTable -> dynamodb streams -> event bridge pipes -> AccountEventsTopic -> (BankingSvcEventsQueue -> BankingSvcEventFn | QuerySvcEventsQueue -> QuerySvcEventFn)
 
 
 ## Design Notes:

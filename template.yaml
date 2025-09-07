@@ -15,7 +15,7 @@ Parameters:
 Globals:
   Function:
     Timeout: 30
-    Runtime: nodejs18.x
+    Runtime: nodejs22.x
     MemorySize: 256
     Architectures:
       - x86_64
@@ -69,6 +69,52 @@ Resources:
             UserPoolArn: !GetAtt UserPool.Arn
 
   # DynamoDB Tables
+  # Idempotency Tables
+  LedgerSvcCommandFnIdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "LedgerSvc-CommandFn-Idempotency-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiration
+        Enabled: true
+        
+  BankingSvcEventFnIdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "BankingSvc-EventFn-Idempotency-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiration
+        Enabled: true
+        
+  QuerySvcEventFnIdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "QuerySvc-EventFn-Idempotency-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiration
+        Enabled: true
+        
   # Ledger Service Tables
   LedgerSvcLedgerTable:
     Type: AWS::DynamoDB::Table
@@ -81,13 +127,11 @@ Resources:
       KeySchema:
         - AttributeName: id
           KeyType: HASH
-      StreamSpecification:
-        StreamViewType: NEW_AND_OLD_IMAGES
 
-  LedgerSvcLedgerEventsTable:
+  LedgerSvcOutboxTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "LedgerSvc-LedgerEventsTable-${Env}"
+      TableName: !Sub "LedgerSvc-OutboxTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -110,13 +154,11 @@ Resources:
       KeySchema:
         - AttributeName: id
           KeyType: HASH
-      StreamSpecification:
-        StreamViewType: NEW_AND_OLD_IMAGES
 
-  AccountsSvcAccountsEventsTable:
+  AccountsSvcOutboxTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "AccountsSvc-AccountsEventsTable-${Env}"
+      TableName: !Sub "AccountsSvc-OutboxTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -193,10 +235,10 @@ Resources:
         - AttributeName: id
           KeyType: HASH
 
-  BankingSvcOperationsCommandsTable:
+  BankingSvcOutboxTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "BankingSvc-OperationsCommandsTable-${Env}"
+      TableName: !Sub "BankingSvc-OutboxTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -207,7 +249,7 @@ Resources:
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
 
-  # SQS Queues
+  # SQS Queues for Commands
   DepositCommandQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -236,32 +278,138 @@ Resources:
     Properties:
       QueueName: !Sub "withdraw-command-dlq-${Env}"
 
-  EventsQueue:
+  # SNS Topics for Events
+  LedgerEventTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "ledger-event-${Env}"
+
+  AccountEventTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "account-event-${Env}"
+      
+
+  # SQS Queues for SNS Subscriptions
+  BankingSvcEventQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub "events-queue-${Env}"
+      QueueName: !Sub "banking-svc-event-queue-${Env}"
       VisibilityTimeout: 60
       RedrivePolicy:
-        deadLetterTargetArn: !GetAtt EventsDLQ.Arn
+        deadLetterTargetArn: !GetAtt BankingSvcEventDLQ.Arn
         maxReceiveCount: 3
 
-  EventsDLQ:
+  BankingSvcEventDLQ:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub "events-dlq-${Env}"
+      QueueName: !Sub "banking-svc-event-dlq-${Env}"
+
+  QuerySvcEventQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "query-svc-event-queue-${Env}"
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt QuerySvcEventDLQ.Arn
+        maxReceiveCount: 3
+
+  QuerySvcEventDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "query-svc-event-dlq-${Env}"
+      
+  # SNS Subscriptions
+  BankingSvcQueueLedgerEventsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref LedgerEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt BankingSvcEventQueue.Arn
+      RawMessageDelivery: true
+      
+  BankingSvcQueueAccountsEventsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AccountEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt BankingSvcEventQueue.Arn
+      RawMessageDelivery: true
+      
+      
+  QuerySvcQueueLedgerEventsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref LedgerEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt QuerySvcEventQueue.Arn
+      RawMessageDelivery: true
+      
+  QuerySvcQueueAccountsEventsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AccountEventTopic
+      Protocol: sqs
+      Endpoint: !GetAtt QuerySvcEventQueue.Arn
+      RawMessageDelivery: true
+      
+      
+  # SQS Queue Policies for SNS
+  BankingSvcEventQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref BankingSvcEventQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt BankingSvcEventQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn:
+                  - !Ref LedgerEventTopic
+                  - !Ref AccountEventTopic
+                  
+  QuerySvcEventQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref QuerySvcEventQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt QuerySvcEventQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn:
+                  - !Ref LedgerEventTopic
+                  - !Ref AccountEventTopic
 
   # Lambda Functions
   # Ledger Service Lambda
-  LedgerCommandHandlerFunction:
+  LedgerSvcCommandFn:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/ledger/dist
-      Handler: command.handler
+      Handler: index.commandFunctionHandler
+      Environment:
+        Variables:
+          IDEMPOTENCY_TABLE: !Ref LedgerSvcCommandFnIdempotencyTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref LedgerSvcLedgerTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref LedgerSvcLedgerEventsTable
+            TableName: !Ref LedgerSvcOutboxTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LedgerSvcCommandFnIdempotencyTable
         - SQSPollerPolicy:
             QueueName: !GetAtt DepositCommandQueue.QueueName
         - SQSPollerPolicy:
@@ -283,16 +431,16 @@ Resources:
               - ReportBatchItemFailures
 
   # Accounts Service Lambda
-  AccountsHttpHandlerFunction:
+  AccountsSvcApiFn:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/accounts/dist
-      Handler: http.handler
+      Handler: index.apiFunctionHandler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref AccountsSvcAccountsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref AccountsSvcAccountsEventsTable
+            TableName: !Ref AccountsSvcOutboxTable
       Events:
         CreateAccount:
           Type: Api
@@ -320,11 +468,11 @@ Resources:
             Method: get
 
   # Query Service Lambdas
-  QueryHttpHandlerFunction:
+  QuerySvcApiFn:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/query/dist
-      Handler: http.handler
+      Handler: index.apiFunctionHandler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref QuerySvcTransactionsTable
@@ -352,11 +500,14 @@ Resources:
             Path: /balances
             Method: get
             
-  QueryEventHandlerFunction:
+  QuerySvcEventFn:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/query/dist
-      Handler: event.handler
+      Handler: index.eventFunctionHandler
+      Environment:
+        Variables:
+          IDEMPOTENCY_TABLE: !Ref QuerySvcEventFnIdempotencyTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref QuerySvcTransactionsTable
@@ -364,28 +515,30 @@ Resources:
             TableName: !Ref QuerySvcBalancesTable
         - DynamoDBCrudPolicy:
             TableName: !Ref QuerySvcAccountsProjectionTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref QuerySvcEventFnIdempotencyTable
         - SQSPollerPolicy:
-            QueueName: !GetAtt EventsQueue.QueueName
+            QueueName: !GetAtt QuerySvcEventQueue.QueueName
       Events:
-        EventsEvent:
+        QueryEventsEvent:
           Type: SQS
           Properties:
-            Queue: !GetAtt EventsQueue.Arn
+            Queue: !GetAtt QuerySvcEventQueue.Arn
             BatchSize: 10
             FunctionResponseTypes:
               - ReportBatchItemFailures
 
   # Banking Service Lambdas
-  BankingHttpHandlerFunction:
+  BankingSvcApiFn:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/banking/dist
-      Handler: http.handler
+      Handler: index.apiFunctionHandler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref BankingSvcOperationsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref BankingSvcOperationsCommandsTable
+            TableName: !Ref BankingSvcOutboxTable
         - DynamoDBCrudPolicy:
             TableName: !Ref BankingSvcAccountsProjectionTable
         - SQSSendMessagePolicy:
@@ -412,33 +565,189 @@ Resources:
             Path: /operation-status/{operation_id}
             Method: get
             
-  BankingEventHandlerFunction:
+  BankingSvcEventFn:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: services/banking/dist
-      Handler: event.handler
+      Handler: index.eventFunctionHandler
+      Environment:
+        Variables:
+          IDEMPOTENCY_TABLE: !Ref BankingSvcEventFnIdempotencyTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref BankingSvcOperationsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref BankingSvcOperationsCommandsTable
+            TableName: !Ref BankingSvcOutboxTable
         - DynamoDBCrudPolicy:
             TableName: !Ref BankingSvcAccountsProjectionTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BankingSvcEventFnIdempotencyTable
         - SQSPollerPolicy:
-            QueueName: !GetAtt EventsQueue.QueueName
+            QueueName: !GetAtt BankingSvcEventQueue.QueueName
       Events:
-        EventsEvent:
+        BankingEventsEvent:
           Type: SQS
           Properties:
-            Queue: !GetAtt EventsQueue.Arn
+            Queue: !GetAtt BankingSvcEventQueue.Arn
             BatchSize: 10
             FunctionResponseTypes:
               - ReportBatchItemFailures
 
+  # EventBridge Pipes for DynamoDB Streams to SNS
+  LedgerOutboxToSNSPipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Name: !Sub "ledger-outbox-to-sns-${Env}"
+      RoleArn: !GetAtt PipeExecutionRole.Arn
+      Source: !GetAtt LedgerSvcOutboxTable.StreamArn
+      SourceParameters:
+        DynamoDBStreamParameters:
+          StartingPosition: LATEST
+          BatchSize: 10
+          DeadLetterConfig:
+            Arn: !GetAtt PipeDLQ.Arn
+          MaximumBatchingWindowInSeconds: 1
+          # Only process new items
+      Target: !Ref LedgerEventTopic
+      TargetParameters:
+        InputTemplate: |
+          {
+            "id": <$.dynamodb.NewImage.id.S>,
+            "timestamp": <$.dynamodb.NewImage.timestamp.S>,
+            "eventType": <$.dynamodb.NewImage.eventType.S>,
+            "eventData": <$.dynamodb.NewImage.eventData.M>
+          }
+        
+  AccountsOutboxToSNSPipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Name: !Sub "accounts-outbox-to-sns-${Env}"
+      RoleArn: !GetAtt PipeExecutionRole.Arn
+      Source: !GetAtt AccountsSvcOutboxTable.StreamArn
+      SourceParameters:
+        DynamoDBStreamParameters:
+          StartingPosition: LATEST
+          BatchSize: 10
+          DeadLetterConfig:
+            Arn: !GetAtt PipeDLQ.Arn
+          MaximumBatchingWindowInSeconds: 1
+          # Only process new items
+      Target: !Ref AccountEventTopic
+      TargetParameters:
+        InputTemplate: |
+          {
+            "id": <$.dynamodb.NewImage.id.S>,
+            "timestamp": <$.dynamodb.NewImage.timestamp.S>,
+            "eventType": <$.dynamodb.NewImage.eventType.S>,
+            "eventData": <$.dynamodb.NewImage.eventData.M>
+          }
+          
+  BankingOutboxToDepositCommandQueuePipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Name: !Sub "banking-outbox-to-deposit-command-${Env}"
+      RoleArn: !GetAtt PipeExecutionRole.Arn
+      Source: !GetAtt BankingSvcOutboxTable.StreamArn
+      SourceParameters:
+        DynamoDBStreamParameters:
+          StartingPosition: LATEST
+          BatchSize: 10
+          DeadLetterConfig:
+            Arn: !GetAtt PipeDLQ.Arn
+          MaximumBatchingWindowInSeconds: 1
+          # Only process deposit command events
+      Target: !GetAtt DepositCommandQueue.Arn
+      TargetParameters:
+        InputTemplate: |
+          {
+            "id": <$.dynamodb.NewImage.id.S>,
+            "timestamp": <$.dynamodb.NewImage.timestamp.S>,
+            "eventType": <$.dynamodb.NewImage.eventType.S>,
+            "eventData": <$.dynamodb.NewImage.eventData.M>
+          }
+          
+  BankingOutboxToWithdrawCommandQueuePipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Name: !Sub "banking-outbox-to-withdraw-command-${Env}"
+      RoleArn: !GetAtt PipeExecutionRole.Arn
+      Source: !GetAtt BankingSvcOutboxTable.StreamArn
+      SourceParameters:
+        DynamoDBStreamParameters:
+          StartingPosition: LATEST
+          BatchSize: 10
+          DeadLetterConfig:
+            Arn: !GetAtt PipeDLQ.Arn
+          MaximumBatchingWindowInSeconds: 1
+          # Only process withdraw command events
+      Target: !GetAtt WithdrawCommandQueue.Arn
+      TargetParameters:
+        InputTemplate: |
+          {
+            "id": <$.dynamodb.NewImage.id.S>,
+            "timestamp": <$.dynamodb.NewImage.timestamp.S>,
+            "eventType": <$.dynamodb.NewImage.eventType.S>,
+            "eventData": <$.dynamodb.NewImage.eventData.M>
+          }
+          
+  # EventBridge Pipes DLQ
+  PipeDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "pipe-dlq-${Env}"
+      
+  # IAM Role for EventBridge Pipes
+  PipeExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: pipes.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEventBridgePipesFullAccess
+      Policies:
+        - PolicyName: DynamoDBStreamAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeStream
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                  - dynamodb:ListStreams
+                Resource:
+                  - !GetAtt LedgerSvcOutboxTable.StreamArn
+                  - !GetAtt AccountsSvcOutboxTable.StreamArn
+                  - !GetAtt BankingSvcOutboxTable.StreamArn
+        - PolicyName: SNSPublishAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource:
+                  - !Ref LedgerEventTopic
+                  - !Ref AccountEventTopic
+        - PolicyName: SQSSendMessageAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: 
+                  - !GetAtt PipeDLQ.Arn
+                  - !GetAtt DepositCommandQueue.Arn
+                  - !GetAtt WithdrawCommandQueue.Arn
+
 Outputs:
   ApiEndpoint:
     Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Env}/"
   UserPoolId:
     Description: "Cognito User Pool ID"
     Value: !Ref UserPool

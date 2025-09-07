@@ -65,6 +65,15 @@ sam local start-api
 npm run deploy
 ```
 
+## Authentication
+
+```bash
+aws cognito-idp initiate-auth \
+  --client-id 3qacpltbnk17amkk52urt40r3 \
+  --auth-flow USER_PASSWORD_AUTH \
+  --auth-parameters USERNAME=test@mail.com,PASSWORD=Aa123456
+```
+
 ## Architecture
 
 This project follows an event-driven microservices architecture with the following components:
@@ -74,6 +83,8 @@ This project follows an event-driven microservices architecture with the followi
 - **Accounts Service**: Manages account information
 - **Query Service**: For reading/querying balances and transaction histories
 - **Notifications Service**: For sending notifications (not implemented)
+
+![Event Driven Architecture](./docs/EDA.png)
 
 ### Architectural Concepts 
 
