@@ -5,6 +5,20 @@ import { createDefaultTelemetryBundle } from '@digital-banking/utils';
 import { depositCommandHandler } from './command-handlers/deposit-command-handler';
 import { withdrawCommandHandler } from './command-handlers/withdraw-command-handler';
 import { BankingCommand } from '@digital-banking/commands';
+import { IdempotencyConfig, makeIdempotent } from '@aws-lambda-powertools/idempotency';
+import { DynamoDBPersistenceLayer } from '@aws-lambda-powertools/idempotency/dynamodb';
+
+// Configure idempotency
+const persistenceStore = new DynamoDBPersistenceLayer({
+  tableName: process.env.IDEMPOTENCY_TABLE || 'LedgerSvc-CommandFn-Idempotency-dev',
+});
+
+const idempotencyConfig = new IdempotencyConfig({
+  // Use message ID as the idempotency key
+  eventKeyJmesPath: 'Records[*].body | fromjson(@).id',
+  // TTL for idempotency records (24 hours)
+  expiresAfterSeconds: 86400,
+});
 
 /**
  * Creates a command handler with dependency injection support
@@ -32,7 +46,11 @@ export function createCommandFunctionHandler(
     for (const record of event.Records) {
       try {
         const message = JSON.parse(record.body) as BankingCommand;
-        logger.info('Processing command', { messageId: record.messageId, commandType: message.type });
+        logger.info('Processing command', { 
+          messageId: record.messageId, 
+          commandType: message.type, 
+          messageUuid: message.id
+        });
 
         switch (message.type) {
           case 'DEPOSIT_CMD':
@@ -55,8 +73,14 @@ export function createCommandFunctionHandler(
     return { batchItemFailures };
   };
   
+  // Make the handler idempotent
+  const idempotentHandler = makeIdempotent(commandHandler, {
+    persistenceStore,
+    config: idempotencyConfig
+  });
+  
   // Return the handler with middleware
-  return commonEventMiddleware(commandHandler, telemetry);
+  return commonEventMiddleware(idempotentHandler, telemetry);
 }
 
 // Export the default handler instance

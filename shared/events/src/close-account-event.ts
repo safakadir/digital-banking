@@ -6,5 +6,6 @@ import { BaseEvent } from './base-event';
 export interface CloseAccountEvent extends BaseEvent {
   type: 'CLOSE_ACCOUNT_EVENT';
   accountId: string;
+  userId: string;
   reason?: string;
 }

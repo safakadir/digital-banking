@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent } from 'aws-lambda';
 import { ValidationError } from '@digital-banking/errors';
-import { CreateAccountRequest } from '../models';
+import { CreateAccountRequest } from '../dto';
 
 /**
  * Validator for create account request

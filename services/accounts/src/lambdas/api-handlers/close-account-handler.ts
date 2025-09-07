@@ -1,5 +1,6 @@
 import { commonApiMiddleware, validationMiddleware, errorHandlerMiddleware } from "@digital-banking/middleware";
 import { TelemetryBundle } from "@digital-banking/utils";
+import { CloseAccountResponse } from "../../dto";
 import { validateAccountIdParam } from "../../validators/account-validators";
 import { AccountService } from "../../services";
 
@@ -15,13 +16,16 @@ export const closeAccountHandler = (
   // Call service layer
   await accountService.closeAccount(accountId);
   
+  // Build response DTO
+  const response: CloseAccountResponse = {
+    message: 'Account closed successfully',
+    accountId
+  };
+  
   // Return success response
   return {
     statusCode: 200,
-    body: JSON.stringify({
-      message: 'Account closed successfully',
-      accountId
-    })
+    body: JSON.stringify(response)
   };
 }, telemetry)
   .use(validationMiddleware(validateAccountIdParam, telemetry))

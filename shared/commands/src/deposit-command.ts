@@ -6,6 +6,7 @@ import { BaseCommand } from './base-command';
 export interface DepositCommand extends BaseCommand {
   type: 'DEPOSIT_CMD';
   accountId: string;
+  userId: string;
   amount: number;
   description?: string;
   operationId: string;

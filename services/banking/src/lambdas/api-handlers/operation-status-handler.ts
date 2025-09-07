@@ -1,5 +1,6 @@
 import { commonApiMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
+import { OperationStatusResponse } from '../../dto';
 import { BankingService } from '../../services';
 
 export const operationStatusHandler = (
@@ -21,10 +22,21 @@ export const operationStatusHandler = (
     // Call service layer
     const result = await bankingService.getOperationStatus(operationId);
     
+    // Build response DTO
+    const response: OperationStatusResponse = {
+      operationId: result.operationId,
+      accountId: result.accountId,
+      type: result.type as 'deposit' | 'withdraw',
+      amount: result.amount,
+      status: result.status as 'pending' | 'completed' | 'failed',
+      createdAt: result.timestamp, // Map timestamp to createdAt
+      completedAt: result.status === 'COMPLETED' ? result.timestamp : undefined
+    };
+    
     // Return success response
     return {
       statusCode: 200,
-      body: JSON.stringify(result)
+      body: JSON.stringify(response)
     };
   } catch (error) {
     logger.error('Error getting operation status', { error });

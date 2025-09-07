@@ -1,5 +1,6 @@
 import { commonApiMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
+import { GetTransactionsResponse } from '../../dto';
 import { QueryService } from '../../services';
 
 export const getTransactionsHandler = (
@@ -21,10 +22,24 @@ export const getTransactionsHandler = (
     // Call service layer
     const result = await queryService.getTransactions(accountId);
     
+    // Build response DTO - map service transactions to proper Transaction model
+    const response: GetTransactionsResponse = {
+      transactions: result.transactions.map((tx: any) => ({
+        id: tx.id,
+        accountId: result.accountId,
+        type: tx.type.toLowerCase() as 'deposit' | 'withdraw',
+        amount: tx.amount,
+        balance: tx.balance || 0, // Default balance if not provided
+        status: (tx.status || 'completed').toLowerCase() as 'completed' | 'failed',
+        timestamp: tx.timestamp,
+        description: tx.description || `${tx.type} operation`
+      }))
+    };
+    
     // Return success response
     return {
       statusCode: 200,
-      body: JSON.stringify(result)
+      body: JSON.stringify(response)
     };
   } catch (error) {
     logger.error('Error getting transactions', { error });

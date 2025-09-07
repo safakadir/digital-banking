@@ -1,5 +1,6 @@
 import { commonApiMiddleware, validationMiddleware, errorHandlerMiddleware } from "@digital-banking/middleware";
 import { TelemetryBundle } from "@digital-banking/utils";
+import { GetAccountsResponse } from "../../dto";
 import { validateGetAccountsRequest } from "../../validators/account-validators";
 import { AccountService } from "../../services";
 
@@ -15,10 +16,13 @@ export const getAccountsHandler = (
   // Call service layer
   const result = await accountService.getAccounts(userId);
   
+  // Build response DTO
+  const response: GetAccountsResponse = result;
+  
   // Return success response
   return {
     statusCode: 200,
-    body: JSON.stringify(result)
+    body: JSON.stringify(response)
   };
 }, telemetry)
   .use(validationMiddleware(validateGetAccountsRequest, telemetry))

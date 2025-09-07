@@ -24,7 +24,7 @@ export function createApiFunctionHandler(
     handler: createAccountHandler(accountService, telemetry)
   },
   {
-    method: 'POST',
+    method: 'PUT',
     path: '/accounts/{account_id}/close',
     handler: closeAccountHandler(accountService, telemetry)
   },

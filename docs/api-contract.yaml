@@ -1,0 +1,751 @@
+openapi: 3.0.3
+info:
+  title: Digital Banking Platform API
+  description: |
+    Event-driven microservices architecture için dijital bankacılık platformu API'si.
+    
+    ## Authentication
+    Tüm endpoint'ler AWS Cognito JWT token gerektirmektedir.
+    
+    ## Architecture
+    Bu API event-driven microservices mimarisi kullanır:
+    - **Accounts Service**: Hesap yönetimi
+    - **Banking Service**: Para yatırma/çekme işlemleri
+    - **Query Service**: Bakiye ve işlem geçmişi sorguları
+    - **Ledger Service**: İşlem kayıtları (asenkron)
+    
+    ## Asenkron İşlemler
+    Para yatırma ve çekme işlemleri asenkron olarak işlenir. İşlem durumunu kontrol etmek için `/operation-status/{operation_id}` endpoint'ini kullanın.
+  version: 1.0.0
+  contact:
+    name: Digital Banking Platform
+  license:
+    name: MIT
+
+servers:
+  - url: https://{api-gateway-url}.execute-api.{region}.amazonaws.com/{stage}
+    description: AWS API Gateway
+    variables:
+      api-gateway-url:
+        default: your-api-gateway-id
+        description: API Gateway ID
+      region:
+        default: us-east-1
+        description: AWS Region
+      stage:
+        default: dev
+        description: Deployment stage
+        enum:
+          - dev
+          - test
+          - prod
+
+security:
+  - CognitoAuth: []
+
+paths:
+  /accounts:
+    post:
+      tags:
+        - Accounts
+      summary: Yeni hesap oluştur
+      description: Kullanıcı için yeni bir banka hesabı oluşturur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+            example:
+              name: "Ana Hesap"
+              currency: "TRY"
+      responses:
+        '201':
+          description: Hesap başarıyla oluşturuldu
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/Account'
+              example:
+                message: "Account created successfully"
+                accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                userId: "us-east-1:12345678-1234-1234-1234-123456789012"
+                name: "Ana Hesap"
+                currency: "TRY"
+                status: "active"
+                createdAt: "2024-01-15T10:30:00Z"
+                updatedAt: "2024-01-15T10:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      tags:
+        - Accounts
+      summary: Kullanıcının tüm hesaplarını listele
+      description: Giriş yapan kullanıcının tüm hesaplarını getirir
+      responses:
+        '200':
+          description: Hesaplar başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Account'
+              example:
+                - accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                  userId: "us-east-1:12345678-1234-1234-1234-123456789012"
+                  name: "Ana Hesap"
+                  currency: "TRY"
+                  status: "active"
+                  createdAt: "2024-01-15T10:30:00Z"
+                  updatedAt: "2024-01-15T10:30:00Z"
+                - accountId: "acc_2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p1a"
+                  userId: "us-east-1:12345678-1234-1234-1234-123456789012"
+                  name: "USD Hesap"
+                  currency: "USD"
+                  status: "active"
+                  createdAt: "2024-01-16T14:20:00Z"
+                  updatedAt: "2024-01-16T14:20:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts/{account_id}:
+    get:
+      tags:
+        - Accounts
+      summary: Hesap detaylarını getir
+      description: Belirtilen hesabın detaylı bilgilerini getirir
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: Hesap detayları başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+              example:
+                accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                userId: "us-east-1:12345678-1234-1234-1234-123456789012"
+                name: "Ana Hesap"
+                currency: "TRY"
+                status: "active"
+                createdAt: "2024-01-15T10:30:00Z"
+                updatedAt: "2024-01-15T10:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts/{account_id}/close:
+    put:
+      tags:
+        - Accounts
+      summary: Hesabı kapat
+      description: Belirtilen hesabı kapatır
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: Hesap başarıyla kapatıldı
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      accountId:
+                        type: string
+              example:
+                message: "Account closed successfully"
+                accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /deposit:
+    post:
+      tags:
+        - Banking
+      summary: Para yatırma işlemi
+      description: |
+        Belirtilen hesaba para yatırma işlemi başlatır. 
+        İşlem asenkron olarak gerçekleşir ve durumu `/operation-status/{operation_id}` endpoint'i ile takip edilebilir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepositRequest'
+            example:
+              accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+              amount: 1000.50
+      responses:
+        '202':
+          description: Para yatırma işlemi başlatıldı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationInitiatedResponse'
+              example:
+                message: "Deposit operation initiated"
+                operationId: "op_deposit_1a2b3c4d5e6f7g8h9i0j1k2l"
+                status: "pending"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /withdraw:
+    post:
+      tags:
+        - Banking
+      summary: Para çekme işlemi
+      description: |
+        Belirtilen hesaptan para çekme işlemi başlatır. 
+        İşlem asenkron olarak gerçekleşir ve durumu `/operation-status/{operation_id}` endpoint'i ile takip edilebilir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawRequest'
+            example:
+              accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+              amount: 500.25
+      responses:
+        '202':
+          description: Para çekme işlemi başlatıldı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationInitiatedResponse'
+              example:
+                message: "Withdraw operation initiated"
+                operationId: "op_withdraw_2b3c4d5e6f7g8h9i0j1k2l3m"
+                status: "pending"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /operation-status/{operation_id}:
+    get:
+      tags:
+        - Banking
+      summary: İşlem durumunu sorgula
+      description: Belirtilen işlemin durumunu getirir
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+      responses:
+        '200':
+          description: İşlem durumu başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationStatus'
+              example:
+                operationId: "op_deposit_1a2b3c4d5e6f7g8h9i0j1k2l"
+                accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                type: "deposit"
+                amount: 1000.50
+                status: "completed"
+                createdAt: "2024-01-15T10:30:00Z"
+                completedAt: "2024-01-15T10:30:05Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /transactions/{account_id}:
+    get:
+      tags:
+        - Query
+      summary: Hesap işlem geçmişini getir
+      description: Belirtilen hesabın tüm işlem geçmişini getirir
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: İşlem geçmişi başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+              example:
+                transactions:
+                  - id: "tx_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                    accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                    type: "deposit"
+                    amount: 1000.50
+                    balance: 1000.50
+                    status: "completed"
+                    timestamp: "2024-01-15T10:30:00Z"
+                    description: "Para yatırma işlemi"
+                  - id: "tx_2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p1a"
+                    accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                    type: "withdraw"
+                    amount: 200.00
+                    balance: 800.50
+                    status: "completed"
+                    timestamp: "2024-01-15T14:20:00Z"
+                    description: "Para çekme işlemi"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /balances/{account_id}:
+    get:
+      tags:
+        - Query
+      summary: Hesap bakiyesini getir
+      description: Belirtilen hesabın güncel bakiyesini getirir
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: Hesap bakiyesi başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+              example:
+                accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                balance: 1250.75
+                currency: "TRY"
+                lastUpdated: "2024-01-15T14:20:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /balances:
+    get:
+      tags:
+        - Query
+      summary: Kullanıcının tüm hesap bakiyelerini getir
+      description: Giriş yapan kullanıcının tüm hesaplarının bakiyelerini getirir
+      responses:
+        '200':
+          description: Hesap bakiyeleri başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BalanceWithAccountInfo'
+              example:
+                - accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+                  accountName: "Ana Hesap"
+                  balance: 1250.75
+                  currency: "TRY"
+                  lastUpdated: "2024-01-15T14:20:00Z"
+                - accountId: "acc_2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p1a"
+                  accountName: "USD Hesap"
+                  balance: 500.00
+                  currency: "USD"
+                  lastUpdated: "2024-01-16T09:15:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    CognitoAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: AWS Cognito JWT Token
+
+  parameters:
+    AccountId:
+      name: account_id
+      in: path
+      required: true
+      description: Hesap kimliği (acc_ prefixi ile başlayan 32 karakter hex)
+      schema:
+        type: string
+        pattern: '^acc_[a-f0-9]{32}$'
+        example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+
+    OperationId:
+      name: operation_id
+      in: path
+      required: true
+      description: İşlem kimliği
+      schema:
+        type: string
+        example: "op_deposit_1a2b3c4d5e6f7g8h9i0j1k2l"
+
+  schemas:
+    CreateAccountRequest:
+      type: object
+      required:
+        - name
+        - currency
+      properties:
+        name:
+          type: string
+          minLength: 3
+          description: Hesap adı
+          example: "Ana Hesap"
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Para birimi (ISO 4217 3-letter code)
+          example: "TRY"
+
+    Account:
+      type: object
+      properties:
+        accountId:
+          type: string
+          pattern: '^acc_[a-f0-9]{32}$'
+          description: Hesap kimliği
+          example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        userId:
+          type: string
+          description: Kullanıcı kimliği (Cognito sub)
+          example: "us-east-1:12345678-1234-1234-1234-123456789012"
+        name:
+          type: string
+          description: Hesap adı
+          example: "Ana Hesap"
+        currency:
+          type: string
+          description: Para birimi
+          example: "TRY"
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        createdAt:
+          type: string
+          format: date-time
+          description: Oluşturulma tarihi
+          example: "2024-01-15T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Güncellenme tarihi
+          example: "2024-01-15T10:30:00Z"
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Kapatılma tarihi
+          example: null
+
+
+    AccountStatus:
+      type: string
+      enum:
+        - active
+        - closed
+        - suspended
+      description: Hesap durumu
+      example: "active"
+
+    DepositRequest:
+      type: object
+      required:
+        - accountId
+        - amount
+      properties:
+        accountId:
+          type: string
+          pattern: '^acc_[a-f0-9]{32}$'
+          description: Hesap kimliği
+          example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        amount:
+          type: number
+          minimum: 0.01
+          description: Yatırılacak miktar
+          example: 1000.50
+
+    WithdrawRequest:
+      type: object
+      required:
+        - accountId
+        - amount
+      properties:
+        accountId:
+          type: string
+          pattern: '^acc_[a-f0-9]{32}$'
+          description: Hesap kimliği
+          example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        amount:
+          type: number
+          minimum: 0.01
+          description: Çekilecek miktar
+          example: 500.25
+
+    OperationInitiatedResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            operationId:
+              type: string
+              description: İşlem kimliği
+              example: "op_deposit_1a2b3c4d5e6f7g8h9i0j1k2l"
+            status:
+              type: string
+              enum: [pending]
+              description: İşlem durumu
+              example: "pending"
+
+    OperationStatus:
+      type: object
+      properties:
+        operationId:
+          type: string
+          description: İşlem kimliği
+          example: "op_deposit_1a2b3c4d5e6f7g8h9i0j1k2l"
+        accountId:
+          type: string
+          pattern: '^acc_[a-f0-9]{32}$'
+          description: Hesap kimliği
+          example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        type:
+          type: string
+          enum: [deposit, withdraw]
+          description: İşlem tipi
+          example: "deposit"
+        amount:
+          type: number
+          description: İşlem miktarı
+          example: 1000.50
+        status:
+          type: string
+          enum: [pending, completed, failed]
+          description: İşlem durumu
+          example: "completed"
+        createdAt:
+          type: string
+          format: date-time
+          description: İşlem başlatılma tarihi
+          example: "2024-01-15T10:30:00Z"
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: İşlem tamamlanma tarihi
+          example: "2024-01-15T10:30:05Z"
+        errorMessage:
+          type: string
+          nullable: true
+          description: Hata mesajı (işlem başarısız olduğunda)
+          example: null
+
+    TransactionsResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          description: İşlem kimliği
+          example: "tx_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        accountId:
+          type: string
+          pattern: '^acc_[a-f0-9]{32}$'
+          description: Hesap kimliği
+          example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        type:
+          type: string
+          enum: [deposit, withdraw]
+          description: İşlem tipi
+          example: "deposit"
+        amount:
+          type: number
+          description: İşlem miktarı
+          example: 1000.50
+        balance:
+          type: number
+          description: İşlem sonrası bakiye
+          example: 1000.50
+        status:
+          type: string
+          enum: [completed, failed]
+          description: İşlem durumu
+          example: "completed"
+        timestamp:
+          type: string
+          format: date-time
+          description: İşlem tarihi
+          example: "2024-01-15T10:30:00Z"
+        description:
+          type: string
+          description: İşlem açıklaması
+          example: "Para yatırma işlemi"
+
+    Balance:
+      type: object
+      properties:
+        accountId:
+          type: string
+          pattern: '^acc_[a-f0-9]{32}$'
+          description: Hesap kimliği
+          example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
+        balance:
+          type: number
+          description: Güncel bakiye
+          example: 1250.75
+        currency:
+          type: string
+          description: Para birimi
+          example: "TRY"
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Son güncellenme tarihi
+          example: "2024-01-15T14:20:00Z"
+
+    BalanceWithAccountInfo:
+      allOf:
+        - $ref: '#/components/schemas/Balance'
+        - type: object
+          properties:
+            accountName:
+              type: string
+              description: Hesap adı
+              example: "Ana Hesap"
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Başarı mesajı
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Hata mesajı
+          example: "Invalid request parameters"
+        code:
+          type: string
+          description: Hata kodu
+          example: "VALIDATION_ERROR"
+        timestamp:
+          type: string
+          format: date-time
+          description: Hata tarihi
+          example: "2024-01-15T10:30:00Z"
+
+  responses:
+    BadRequest:
+      description: Geçersiz istek parametreleri
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: "Invalid request parameters"
+            code: "VALIDATION_ERROR"
+            timestamp: "2024-01-15T10:30:00Z"
+
+    Unauthorized:
+      description: Geçersiz veya eksik kimlik doğrulama
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: "Unauthorized access"
+            code: "UNAUTHORIZED"
+            timestamp: "2024-01-15T10:30:00Z"
+
+    NotFound:
+      description: Kaynak bulunamadı
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: "Resource not found"
+            code: "NOT_FOUND"
+            timestamp: "2024-01-15T10:30:00Z"
+
+    Conflict:
+      description: İş kuralı ihlali (örn: yetersiz bakiye)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: "Insufficient balance"
+            code: "INSUFFICIENT_BALANCE"
+            timestamp: "2024-01-15T10:30:00Z"
+
+    InternalServerError:
+      description: Sunucu hatası
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: "Internal server error"
+            code: "INTERNAL_ERROR"
+            timestamp: "2024-01-15T10:30:00Z"
+
+tags:
+  - name: Accounts
+    description: Hesap yönetimi operasyonları
+  - name: Banking
+    description: Para yatırma/çekme operasyonları
+  - name: Query
+    description: Bakiye ve işlem geçmişi sorguları

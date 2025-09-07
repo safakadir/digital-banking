@@ -31,7 +31,7 @@ A simple digital banking platform with event-driven microservices architecture. 
   - Events Received: N/A
   - HTTP Endpoints:
     - POST /accounts: Creates a new account for the user
-    - POST /accounts/{account_id}/close: Closes specified account
+    - PUT /accounts/{account_id}/close: Closes specified account
     - GET /accounts/{account_id}: Gets information about specified account
     - GET /accounts: Gets information about all accounts of the user
 - Query Service: 

@@ -3,5 +3,5 @@
  */
 export interface BaseCommand {
   id: string;
-  timestamp: Date;
+  timestamp: string;
 }

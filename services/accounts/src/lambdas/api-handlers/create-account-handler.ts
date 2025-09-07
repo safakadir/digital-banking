@@ -1,6 +1,6 @@
 import { commonApiMiddleware, validationMiddleware, errorHandlerMiddleware } from "@digital-banking/middleware";
 import { TelemetryBundle } from "@digital-banking/utils";
-import { CreateAccountRequest } from "../../models";
+import { CreateAccountRequest, CreateAccountResponse } from "../../dto";
 import { validateCreateAccountRequest } from "../../validators/account-validators";
 import { AccountService } from "../../services";
 
@@ -23,15 +23,24 @@ export const createAccountHandler = (
   };
   
   // Call service layer
-  const result = await accountService.createAccount(userId, data);
+  const account = await accountService.createAccount(userId, data);
+  
+  // Build response DTO
+  const response: CreateAccountResponse = {
+    message: 'Account created successfully',
+    accountId: account.accountId,
+    userId: account.userId,
+    name: account.name,
+    currency: account.currency,
+    status: account.status,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt
+  };
   
   // Return success response
   return {
     statusCode: 201,
-    body: JSON.stringify({
-      message: 'Account created successfully',
-      ...result
-    })
+    body: JSON.stringify(response)
   };
 }, telemetry)
   .use(validationMiddleware(validateCreateAccountRequest, telemetry))

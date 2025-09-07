@@ -1,5 +1,6 @@
 import { commonApiMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
+import { WithdrawResponse } from '../../dto';
 import { BankingService } from '../../services';
 
 export const withdrawHandler = (
@@ -23,13 +24,17 @@ export const withdrawHandler = (
     // Call service layer
     const result = await bankingService.processWithdraw(body.accountId, body.amount);
     
+    // Build response DTO
+    const response: WithdrawResponse = {
+      message: 'Withdraw operation initiated',
+      operationId: result.operationId,
+      status: 'pending'
+    };
+    
     // Return success response
     return {
       statusCode: 202,
-      body: JSON.stringify({
-        message: 'Withdraw operation initiated',
-        ...result
-      })
+      body: JSON.stringify(response)
     };
   } catch (error) {
     logger.error('Error processing withdraw', { error });

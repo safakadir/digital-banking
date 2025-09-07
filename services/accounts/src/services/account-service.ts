@@ -2,10 +2,9 @@ import { Logger } from '@aws-lambda-powertools/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   Account, 
-  AccountStatus, 
-  AccountSummary 
+  AccountStatus 
 } from '@digital-banking/models';
-import { CreateAccountRequest } from '../models';
+import { CreateAccountRequest } from '../dto';
 import { 
   CreateAccountEvent, 
   CloseAccountEvent 
@@ -40,7 +39,7 @@ export class AccountService {
   /**
    * Create a new account
    */
-  async createAccount(userId: string, data: CreateAccountRequest): Promise<{ accountId: string }> {
+  async createAccount(userId: string, data: CreateAccountRequest): Promise<Account> {
     logger.info('Creating new account in service', { userId, data });
     
     // Generate a new account ID
@@ -74,7 +73,7 @@ export class AccountService {
       
       await this.eventPublisher.publishEvent(event);
       
-      return { accountId };
+      return account;
     } catch (error) {
       logger.error('Error creating account', { error });
       throw new Error(`Failed to create account: ${error instanceof Error ? error.message : String(error)}`);
@@ -126,6 +125,7 @@ export class AccountService {
         type: 'CLOSE_ACCOUNT_EVENT',
         timestamp: now,
         accountId,
+        userId: account.userId,
         reason
       };
       
@@ -155,7 +155,7 @@ export class AccountService {
   /**
    * Get all accounts for a user
    */
-  async getAccounts(userId: string): Promise<{ accounts: AccountSummary[] }> {
+  async getAccounts(userId: string): Promise<{ accounts: Account[] }> {
     logger.info('Getting all accounts in service', { userId });
     
     try {
@@ -169,16 +169,8 @@ export class AccountService {
         }
       });
       
-      // Map to account summaries
-      const accountSummaries: AccountSummary[] = accounts.map((account: Account) => ({
-        accountId: account.accountId,
-        name: account.name,
-        currency: account.currency,
-        status: account.status,
-        createdAt: account.createdAt
-      }));
-      
-      return { accounts: accountSummaries };
+      // Return full accounts
+      return { accounts };
     } catch (error) {
       logger.error('Error getting accounts', { error });
       throw new Error(`Failed to get accounts: ${error instanceof Error ? error.message : String(error)}`);

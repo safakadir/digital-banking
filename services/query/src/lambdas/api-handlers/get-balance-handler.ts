@@ -1,5 +1,6 @@
 import { commonApiMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
+import { GetBalanceResponse } from '../../dto';
 import { QueryService } from '../../services';
 
 export const getBalanceHandler = (
@@ -21,10 +22,18 @@ export const getBalanceHandler = (
     // Call service layer
     const result = await queryService.getBalance(accountId);
     
+    // Build response DTO
+    const response: GetBalanceResponse = {
+      accountId: result.accountId,
+      balance: result.balance,
+      currency: 'TRY', // TODO: Get from account details
+      lastUpdated: result.lastUpdated
+    };
+    
     // Return success response
     return {
       statusCode: 200,
-      body: JSON.stringify(result)
+      body: JSON.stringify(response)
     };
   } catch (error) {
     logger.error('Error getting balance', { error });

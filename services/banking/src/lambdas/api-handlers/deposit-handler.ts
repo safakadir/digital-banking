@@ -1,5 +1,6 @@
 import { commonApiMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
+import { DepositResponse } from '../../dto';
 import { BankingService } from '../../services';
 
 export const depositHandler = (
@@ -23,13 +24,17 @@ export const depositHandler = (
     // Call service layer
     const result = await bankingService.processDeposit(body.accountId, body.amount);
     
+    // Build response DTO
+    const response: DepositResponse = {
+      message: 'Deposit operation initiated',
+      operationId: result.operationId,
+      status: 'pending'
+    };
+    
     // Return success response
     return {
       statusCode: 202,
-      body: JSON.stringify({
-        message: 'Deposit operation initiated',
-        ...result
-      })
+      body: JSON.stringify(response)
     };
   } catch (error) {
     logger.error('Error processing deposit', { error });

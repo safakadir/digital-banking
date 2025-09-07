@@ -100,6 +100,24 @@ N-Tier Architecture vs. Onion Architecture:
 - But it can be transformed to Onion Architecture with some refactoring later, if needed with incoming complexity.
 - Handlers are provided inline in entry points(lambdas) as they're simple and straightforward. They can be extracted to separate files if needed.
 
+## API Endpoints
+
+### Accounts
+- `POST /accounts` - Create new account
+- `GET /accounts` - List all user accounts
+- `GET /accounts/{account_id}` - Get account details
+- `PUT /accounts/{account_id}/close` - Close account
+
+### Banking Operations
+- `POST /deposit` - Deposit money
+- `POST /withdraw` - Withdraw money
+- `GET /operation-status/{operation_id}` - Get operation status
+
+### Query Operations
+- `GET /transactions/{account_id}` - Get account transaction history
+- `GET /balances/{account_id}` - Get account balance
+- `GET /balances` - Get all user account balances
+
 ## Technologies Used
 
 - TypeScript

@@ -6,6 +6,7 @@ import { BaseEvent } from './base-event';
 export interface WithdrawFailedEvent extends BaseEvent {
   type: 'WITHDRAW_FAILED_EVENT';
   accountId: string;
+  userId: string;
   amount: number;
   operationId: string;
   reason: string;
