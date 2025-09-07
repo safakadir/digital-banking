@@ -1,130 +1,36 @@
-import { Logger } from '@aws-lambda-powertools/logger';
-import { Metrics } from '@aws-lambda-powertools/metrics';
-import { Tracer } from '@aws-lambda-powertools/tracer';
 import httpRouter from '@middy/http-router';
-import { commonApiMiddleware } from '@digital-banking/middleware';
 import { createBankingService } from '../services';
+import { createDefaultTelemetryBundle } from '@digital-banking/utils';
+import { depositHandler } from './api-handlers/deposit-handler';
+import { withdrawHandler } from './api-handlers/withdraw-handler';
+import { operationStatusHandler } from './api-handlers/operation-status-handler';
 
 /**
  * Creates an API handler with dependency injection support
  * @param queryService - QueryService instance
- * @param logger - Logger instance
- * @param tracer - Tracer instance
- * @param metrics - Metrics instance
+ * @param telemetry - TelemetryBundle instance
  * @returns HTTP router handler
  */
 export function createApiFunctionHandler(
   bankingService = createBankingService(),
-  logger = new Logger(),
-  tracer = new Tracer(),
-  metrics = new Metrics()
+  telemetry = createDefaultTelemetryBundle()
 ) {
+  const { logger } = telemetry;
   return httpRouter([
   {
     method: 'POST',
     path: '/deposit',
-    handler: commonApiMiddleware(async (event) => {
-      try {
-        const body = event.body ? JSON.parse(event.body) : {};
-        
-        // Validate request
-        if (!body.accountId || !body.amount) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ message: 'Account ID and amount are required' })
-          };
-        }
-        
-        logger.info('Processing deposit request', { accountId: body.accountId, amount: body.amount });
-        
-        // Call service layer
-        const result = await bankingService.processDeposit(body.accountId, body.amount);
-        
-        // Return success response
-        return {
-          statusCode: 202,
-          body: JSON.stringify({
-            message: 'Deposit operation initiated',
-            ...result
-          })
-        };
-      } catch (error) {
-        logger.error('Error processing deposit', { error });
-        return {
-          statusCode: 500,
-          body: JSON.stringify({ message: 'Internal Server Error' })
-        };
-      }
-    }, logger, tracer, metrics)
+    handler: depositHandler(bankingService, telemetry)
   },
   {
     method: 'POST',
     path: '/withdraw',
-    handler: commonApiMiddleware(async (event) => {
-      try {
-        const body = event.body ? JSON.parse(event.body) : {};
-        
-        // Validate request
-        if (!body.accountId || !body.amount) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ message: 'Account ID and amount are required' })
-          };
-        }
-        
-        logger.info('Processing withdraw request', { accountId: body.accountId, amount: body.amount });
-        
-        // Call service layer
-        const result = await bankingService.processWithdraw(body.accountId, body.amount);
-        
-        // Return success response
-        return {
-          statusCode: 202,
-          body: JSON.stringify({
-            message: 'Withdraw operation initiated',
-            ...result
-          })
-        };
-      } catch (error) {
-        logger.error('Error processing withdraw', { error });
-        return {
-          statusCode: 500,
-          body: JSON.stringify({ message: 'Internal Server Error' })
-        };
-      }
-    }, logger, tracer, metrics)
+    handler: withdrawHandler(bankingService, telemetry)
   },
   {
     method: 'GET',
     path: '/operation-status/{operation_id}',
-    handler: commonApiMiddleware(async (event) => {
-      try {
-        const operationId = event.pathParameters?.operation_id;
-        if (!operationId) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ message: 'Operation ID is required' })
-          };
-        }
-        
-        logger.info('Getting operation status', { operationId });
-        
-        // Call service layer
-        const result = await bankingService.getOperationStatus(operationId);
-        
-        // Return success response
-        return {
-          statusCode: 200,
-          body: JSON.stringify(result)
-        };
-      } catch (error) {
-        logger.error('Error getting operation status', { error });
-        return {
-          statusCode: 500,
-          body: JSON.stringify({ message: 'Internal Server Error' })
-        };
-      }
-    }, logger, tracer, metrics)
+    handler: operationStatusHandler(bankingService, telemetry)
   }
 ])};
 

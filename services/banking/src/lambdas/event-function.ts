@@ -1,83 +1,72 @@
-import { SQSEvent, SQSRecord } from 'aws-lambda';
-import { Logger } from '@aws-lambda-powertools/logger';
-import { Metrics } from '@aws-lambda-powertools/metrics';
-import { Tracer } from '@aws-lambda-powertools/tracer';
+import { SQSEvent } from 'aws-lambda';
 import { commonEventMiddleware } from '@digital-banking/middleware';
 import { createBankingService } from '../services';
+import { createDefaultTelemetryBundle } from '@digital-banking/utils';
 import { BankingEvent } from '@digital-banking/events';
+import { depositEventHandler } from './event-handlers/deposit-event-handler';
+import { withdrawSuccessEventHandler } from './event-handlers/withdraw-success-event-handler';
+import { withdrawFailedEventHandler } from './event-handlers/withdraw-failed-event-handler';
+import { createAccountEventHandler } from './event-handlers/create-account-event-handler';
+import { closeAccountEventHandler } from './event-handlers/close-account-event-handler';
 
 /**
  * Creates an event handler with dependency injection support
  * @param bankingService - BankingService instance
- * @param logger - Logger instance
- * @param tracer - Tracer instance
- * @param metrics - Metrics instance
+ * @param telemetry - TelemetryBundle instance
  * @returns Event handler function
  */
 export function createEventFunctionHandler(
   bankingService = createBankingService(),
-  logger = new Logger(),
-  tracer = new Tracer(),
-  metrics = new Metrics()
+  telemetry = createDefaultTelemetryBundle()
 ) {
+  const { logger } = telemetry;
   /**
    * Processes events for the Banking service
    * Returns batchItemFailures for failed records to enable partial batch processing
    */
+
   const eventHandler = async (event: SQSEvent): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
-  logger.info('Processing banking events', { recordCount: event.Records.length });
-  
-  const batchItemFailures: { itemIdentifier: string }[] = [];
-  
-  for (const record of event.Records) {
-    try {
-      await processRecord(record);
-    } catch (error) {
-      logger.error('Error processing record', { error, messageId: record.messageId });
-      batchItemFailures.push({ itemIdentifier: record.messageId });
-    }
-  }
-  
-  return { batchItemFailures };
-};
-
-/**
- * Process a single SQS record
- */
-async function processRecord(record: SQSRecord): Promise<void> {
-  try {
-    const message = JSON.parse(record.body) as BankingEvent;
-    logger.info('Processing event', { messageId: record.messageId, eventType: message.type });
+    logger.info('Processing banking events', { recordCount: event.Records.length });
     
-    switch (message.type) {
-      case 'DEPOSIT_EVENT':
-        await bankingService.processDepositEvent(message);
-        break;
-      case 'WITHDRAW_EVENT':
-        await bankingService.processWithdrawEvent(message);
-        break;
-      case 'WITHDRAW_FAILED_EVENT':
-        await bankingService.processWithdrawFailedEvent(message);
-        break;
-      case 'CREATE_ACCOUNT_EVENT':
-        await bankingService.processCreateAccountEvent(message);
-        break;
-      case 'CLOSE_ACCOUNT_EVENT':
-        await bankingService.processCloseAccountEvent(message);
-        break;
-      default:
-        // Exhaustive check to ensure all event types are handled
-        const _exhaustiveCheck: never = message;
-        logger.warn('Unknown event type', { eventType: (message as any).type });
+    const batchItemFailures: { itemIdentifier: string }[] = [];
+    
+    for (const record of event.Records) {
+      try {
+        const message = JSON.parse(record.body) as BankingEvent;
+        logger.info('Processing event', { messageId: record.messageId, eventType: message.type });
+        
+        switch (message.type) {
+          case 'DEPOSIT_EVENT':
+            await depositEventHandler(bankingService, telemetry)(message);
+            break;
+          case 'WITHDRAW_SUCCESS_EVENT':
+            await withdrawSuccessEventHandler(bankingService, telemetry)(message);
+            break;
+          case 'WITHDRAW_FAILED_EVENT':
+            await withdrawFailedEventHandler(bankingService, telemetry)(message);
+            break;
+          case 'CREATE_ACCOUNT_EVENT':
+            await createAccountEventHandler(bankingService, telemetry)(message);
+            break;
+          case 'CLOSE_ACCOUNT_EVENT':
+            await closeAccountEventHandler(bankingService, telemetry)(message);
+            break;
+          default:
+            // Exhaustive check to ensure all event types are handled
+            const _exhaustiveCheck: never = message;
+            logger.warn('Unknown event type', { eventType: (message as any).type });
+        }
+      } catch (error) {
+        logger.error('Error processing record', { error, messageId: record.messageId });
+        batchItemFailures.push({ itemIdentifier: record.messageId });
+      }
     }
-  } catch (error) {
-    logger.error('Error processing record', { error, messageId: record.messageId });
-    throw error;
-  }
-}
-
+    
+    return { batchItemFailures };
+  };
+  
   // Return the handler with middleware
-  return commonEventMiddleware(eventHandler, logger, tracer, metrics);
+  return commonEventMiddleware(eventHandler, telemetry);
 }
 
 // Export the default handler instance

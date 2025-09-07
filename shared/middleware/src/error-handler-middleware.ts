@@ -1,13 +1,14 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import middy from '@middy/core';
-import { Logger } from '@aws-lambda-powertools/logger';
 import { BaseError } from '@digital-banking/errors';
+import { TelemetryBundle } from '@digital-banking/utils';
 
 /**
  * Middleware for error handling
- * @param logger - Logger instance
+ * @param telemetry - Telemetry bundle containing logger
  */
-export const errorHandlerMiddleware = (logger: Logger) => {
+export const errorHandlerMiddleware = (telemetry: TelemetryBundle) => {
+  const { logger } = telemetry;
   const onError: middy.MiddlewareFn<APIGatewayProxyEvent, APIGatewayProxyResult> = async (request) => {
     const { error } = request;
     

@@ -18,7 +18,7 @@ A simple digital banking platform with event-driven microservices architecture. 
   - Lambda functions: LedgerServiceCommandFunction
   - Commands Received: DEPOSIT_CMD, WITHDRAW_CMD
   - Commands Sent: N/A
-  - Events Emitted: DEPOSIT_EVENT, WITHDRAW_EVENT, WITHDRAW_FAILED_EVENT
+  - Events Emitted: DEPOSIT_EVENT, WITHDRAW_SUCCESS_EVENT, WITHDRAW_FAILED_EVENT
   - Events Received: N/A
   - HTTP Endpoints: N/A
 - Accounts Service:
@@ -41,7 +41,7 @@ A simple digital banking platform with event-driven microservices architecture. 
   - Commands Received: N/A
   - Commands Sent: N/A
   - Events Emitted: N/A
-  - Events Received: DEPOSIT_EVENT, WITHDRAW_EVENT, WITHDRAW_FAILED_EVENT, CREATE_ACCOUNT_EVENT, CLOSE_ACCOUNT_EVENT
+  - Events Received: DEPOSIT_EVENT, WITHDRAW_SUCCESS_EVENT, WITHDRAW_FAILED_EVENT, CREATE_ACCOUNT_EVENT, CLOSE_ACCOUNT_EVENT
   - HTTP Endpoints:
     - GET /transactions/{account_id}
     - GET /balances/{account_id}
@@ -53,7 +53,7 @@ A simple digital banking platform with event-driven microservices architecture. 
   - Commands Received: N/A
   - Commands Sent: DEPOSIT_CMD, WITHDRAW_CMD
   - Events Emitted: N/A
-  - Events Received: DEPOSIT_EVENT, WITHDRAW_EVENT, WITHDRAW_FAILED_EVENT, CREATE_ACCOUNT_EVENT, CLOSE_ACCOUNT_EVENT
+  - Events Received: DEPOSIT_EVENT, WITHDRAW_SUCCESS_EVENT, WITHDRAW_FAILED_EVENT, CREATE_ACCOUNT_EVENT, CLOSE_ACCOUNT_EVENT
   - HTTP Endpoints:
     - POST /deposit
     - POST /withdraw
@@ -65,7 +65,7 @@ A simple digital banking platform with event-driven microservices architecture. 
   - Commands Received: N/A
   - Commands Sent: N/A
   - Events Emitted: N/A
-  - Events Received: DEPOSIT_EVENT, WITHDRAW_EVENT, WITHDRAW_FAILED_EVENT, CREATE_ACCOUNT_EVENT, CLOSE_ACCOUNT_EVENT
+  - Events Received: DEPOSIT_EVENT, WITHDRAW_SUCCESS_EVENT, WITHDRAW_FAILED_EVENT, CREATE_ACCOUNT_EVENT, CLOSE_ACCOUNT_EVENT
   - HTTP Endpoints: N/A
 
 
@@ -76,7 +76,7 @@ Client /deposit --> APIGW --> Banking Service --DEPOSIT_CMD(with outbox pattern)
 --Returns 200 ok with status PENDING after writing the command.
 
 ### Withdraw:
-Client /withdraw --> APIGW --> Banking Service --WITHDRAW_CMD(with outbox pattern) --> SQS --> Ledger Service --WITHDRAW_EVENT(with outbox pattern)--> SQS --> Query Service
+Client /withdraw --> APIGW --> Banking Service --WITHDRAW_CMD(with outbox pattern) --> SQS --> Ledger Service --WITHDRAW_SUCCESS_EVENT(with outbox pattern)--> SQS --> Query Service
 --Returns 200 ok with status PENDING after writing the command.
 
 ### Query Operation Status:

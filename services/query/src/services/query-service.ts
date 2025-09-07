@@ -1,7 +1,7 @@
 import { Logger } from '@aws-lambda-powertools/logger';
 import { 
   DepositEvent, 
-  WithdrawEvent, 
+  WithdrawSuccessEvent, 
   WithdrawFailedEvent, 
   CreateAccountEvent, 
   CloseAccountEvent 
@@ -41,12 +41,12 @@ export class QueryService {
   }
 
   /**
-   * Process a withdraw event
+   * Process a withdraw success event
    */
-  async processWithdrawEvent(event: WithdrawEvent): Promise<void> {
-    logger.info('Processing withdraw event in service', { eventId: event.id });
+  async processWithdrawSuccessEvent(event: WithdrawSuccessEvent): Promise<void> {
+    logger.info('Processing withdraw success event in service', { eventId: event.id });
     
-    // TODO: Implement withdraw event handling
+    // TODO: Implement withdraw success event handling
     // 1. Update transaction history
     // 2. Update account balance
   }

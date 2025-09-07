@@ -31,6 +31,6 @@ export class LedgerService {
     // 2. Check for idempotency
     // 3. Check if sufficient funds
     // 4. Create ledger entry if sufficient funds
-    // 5. Publish WITHDRAW_EVENT or WITHDRAW_FAILED_EVENT to outbox
+    // 5. Publish WITHDRAW_SUCCESS_EVENT or WITHDRAW_FAILED_EVENT to outbox
   }
 }

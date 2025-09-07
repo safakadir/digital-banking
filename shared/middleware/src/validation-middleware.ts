@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import middy from '@middy/core';
-import { Logger } from '@aws-lambda-powertools/logger';
 import { BaseError } from '@digital-banking/errors';
+import { TelemetryBundle } from '@digital-banking/utils';
 
 /**
  * Validator function type
@@ -11,9 +11,10 @@ export type Validator = (event: APIGatewayProxyEvent) => void | Promise<void>;
 /**
  * Middleware for request validation
  * @param validator - Validator function
- * @param logger - Logger instance
+ * @param telemetry - Telemetry bundle containing logger
  */
-export const validatorMiddleware = (validator: Validator, logger: Logger) => {
+export const validationMiddleware = (validator: Validator, telemetry: TelemetryBundle) => {
+  const { logger } = telemetry;
   const before: middy.MiddlewareFn<APIGatewayProxyEvent, APIGatewayProxyResult> = async (request) => {
     try {
       await validator(request.event);
