@@ -14,7 +14,7 @@ A simple digital banking platform with event-driven microservices architecture. 
 ## Microservices:
 - Ledger Service:
   - Description: single source of trust, append only list of transactions with double entry accounting and idempotency.
-  - Database tables: ledger, ledger_events(outbox)
+  - Database tables: Ledger, LedgerEvents(outbox)
   - Lambda functions: LedgerServiceCommandFunction
   - Commands Received: DEPOSIT_CMD, WITHDRAW_CMD
   - Commands Sent: N/A
@@ -23,7 +23,7 @@ A simple digital banking platform with event-driven microservices architecture. 
   - HTTP Endpoints: N/A
 - Accounts Service:
   - Description: account informations
-  - Database tables: accounts, accounts_events(outbox)
+  - Database tables: Accounts, AccountsEvents(outbox)
   - Lambda functions: AccountsServiceHttpFunction
   - Commands Received: N/A
   - Commands Sent: N/A
@@ -36,7 +36,7 @@ A simple digital banking platform with event-driven microservices architecture. 
     - GET /accounts: Gets information about all accounts of the user
 - Query Service: 
   - Description: For reading/queriying balances and transactions histories
-  - Database tables: transactions, balances, accounts_projection
+  - Database tables: Transactions, Balances, AccountsProjection
   - Lambda functions: QueryServiceHttpFunction, QueryServiceEventFunction
   - Commands Received: N/A
   - Commands Sent: N/A
@@ -48,7 +48,7 @@ A simple digital banking platform with event-driven microservices architecture. 
     - GET /balances
 - Banking Service: service to handle user operations
   - Description: service to handle user operations
-  - Database tables: operations, operations_events(outbox), accounts_projection
+  - Database tables: Operations, OperationsCommands(outbox), AccountsProjection
   - Lambda functions: BankingServiceHttpFunction, BankingServiceEventFunction
   - Commands Received: N/A
   - Commands Sent: DEPOSIT_CMD, WITHDRAW_CMD

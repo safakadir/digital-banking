@@ -2,6 +2,16 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Digital Banking Platform with Event-Driven Microservices
 
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: Deployment environment
+
 Globals:
   Function:
     Timeout: 30
@@ -17,13 +27,14 @@ Globals:
         POWERTOOLS_LOGGER_LOG_EVENT: 'true'
         POWERTOOLS_LOGGER_SAMPLE_RATE: 1
         POWERTOOLS_METRICS_NAMESPACE: !Ref AWS::StackName
+        ENV: !Ref Env
 
 Resources:
   # Cognito User Pool for Authentication
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: DigitalBankingUserPool
+      UserPoolName: !Sub "DigitalBankingUserPool-${Env}"
       AutoVerifiedAttributes:
         - email
       UsernameAttributes:
@@ -40,7 +51,7 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       UserPoolId: !Ref UserPool
-      ClientName: DigitalBankingClient
+      ClientName: !Sub "DigitalBankingClient-${Env}"
       GenerateSecret: false
       ExplicitAuthFlows:
         - ALLOW_USER_PASSWORD_AUTH
@@ -50,7 +61,7 @@ Resources:
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: prod
+      StageName: !Ref Env
       Auth:
         DefaultAuthorizer: CognitoAuthorizer
         Authorizers:
@@ -59,10 +70,10 @@ Resources:
 
   # DynamoDB Tables
   # Ledger Service Tables
-  LedgerTable:
+  LedgerSvcLedgerTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: ledger
+      TableName: !Sub "LedgerSvc-LedgerTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -73,10 +84,10 @@ Resources:
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
 
-  LedgerEventsTable:
+  LedgerSvcLedgerEventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: ledger_events
+      TableName: !Sub "LedgerSvc-LedgerEventsTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -88,10 +99,10 @@ Resources:
         StreamViewType: NEW_AND_OLD_IMAGES
 
   # Accounts Service Tables
-  AccountsTable:
+  AccountsSvcAccountsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: accounts
+      TableName: !Sub "AccountsSvc-AccountsTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -102,10 +113,10 @@ Resources:
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
 
-  AccountsEventsTable:
+  AccountsSvcAccountsEventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: accounts_events
+      TableName: !Sub "AccountsSvc-AccountsEventsTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -117,10 +128,10 @@ Resources:
         StreamViewType: NEW_AND_OLD_IMAGES
 
   # Query Service Tables
-  TransactionsTable:
+  QuerySvcTransactionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: transactions
+      TableName: !Sub "QuerySvc-TransactionsTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -133,10 +144,10 @@ Resources:
         - AttributeName: id
           KeyType: RANGE
 
-  BalancesTable:
+  QuerySvcBalancesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: balances
+      TableName: !Sub "QuerySvc-BalancesTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: account_id
@@ -145,10 +156,10 @@ Resources:
         - AttributeName: account_id
           KeyType: HASH
 
-  AccountsProjectionTable:
+  QuerySvcAccountsProjectionTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: accounts_projection
+      TableName: !Sub "QuerySvc-AccountsProjectionTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -158,10 +169,22 @@ Resources:
           KeyType: HASH
 
   # Banking Service Tables
-  OperationsTable:
+  BankingSvcOperationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: operations
+      TableName: !Sub "BankingSvc-OperationsTable-${Env}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+          
+  BankingSvcAccountsProjectionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "BankingSvc-AccountsProjectionTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -170,10 +193,10 @@ Resources:
         - AttributeName: id
           KeyType: HASH
 
-  OperationsEventsTable:
+  BankingSvcOperationsCommandsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: operations_events
+      TableName: !Sub "BankingSvc-OperationsCommandsTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -188,7 +211,7 @@ Resources:
   DepositCommandQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: deposit-command-queue
+      QueueName: !Sub "deposit-command-queue-${Env}"
       VisibilityTimeout: 60
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt DepositCommandDLQ.Arn
@@ -197,12 +220,12 @@ Resources:
   DepositCommandDLQ:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: deposit-command-dlq
+      QueueName: !Sub "deposit-command-dlq-${Env}"
 
   WithdrawCommandQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: withdraw-command-queue
+      QueueName: !Sub "withdraw-command-queue-${Env}"
       VisibilityTimeout: 60
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt WithdrawCommandDLQ.Arn
@@ -211,12 +234,12 @@ Resources:
   WithdrawCommandDLQ:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: withdraw-command-dlq
+      QueueName: !Sub "withdraw-command-dlq-${Env}"
 
   EventsQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: events-queue
+      QueueName: !Sub "events-queue-${Env}"
       VisibilityTimeout: 60
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt EventsDLQ.Arn
@@ -225,7 +248,7 @@ Resources:
   EventsDLQ:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: events-dlq
+      QueueName: !Sub "events-dlq-${Env}"
 
   # Lambda Functions
   # Ledger Service Lambda
@@ -236,9 +259,9 @@ Resources:
       Handler: command.handler
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref LedgerTable
+            TableName: !Ref LedgerSvcLedgerTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref LedgerEventsTable
+            TableName: !Ref LedgerSvcLedgerEventsTable
         - SQSPollerPolicy:
             QueueName: !GetAtt DepositCommandQueue.QueueName
         - SQSPollerPolicy:
@@ -267,9 +290,9 @@ Resources:
       Handler: http.handler
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref AccountsTable
+            TableName: !Ref AccountsSvcAccountsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref AccountsEventsTable
+            TableName: !Ref AccountsSvcAccountsEventsTable
       Events:
         CreateAccount:
           Type: Api
@@ -304,11 +327,11 @@ Resources:
       Handler: http.handler
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref TransactionsTable
+            TableName: !Ref QuerySvcTransactionsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref BalancesTable
+            TableName: !Ref QuerySvcBalancesTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref AccountsProjectionTable
+            TableName: !Ref QuerySvcAccountsProjectionTable
       Events:
         GetTransactions:
           Type: Api
@@ -336,11 +359,11 @@ Resources:
       Handler: event.handler
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref TransactionsTable
+            TableName: !Ref QuerySvcTransactionsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref BalancesTable
+            TableName: !Ref QuerySvcBalancesTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref AccountsProjectionTable
+            TableName: !Ref QuerySvcAccountsProjectionTable
         - SQSPollerPolicy:
             QueueName: !GetAtt EventsQueue.QueueName
       Events:
@@ -360,11 +383,11 @@ Resources:
       Handler: http.handler
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref OperationsTable
+            TableName: !Ref BankingSvcOperationsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref OperationsEventsTable
+            TableName: !Ref BankingSvcOperationsCommandsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref AccountsProjectionTable
+            TableName: !Ref BankingSvcAccountsProjectionTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt DepositCommandQueue.QueueName
         - SQSSendMessagePolicy:
@@ -396,11 +419,11 @@ Resources:
       Handler: event.handler
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref OperationsTable
+            TableName: !Ref BankingSvcOperationsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref OperationsEventsTable
+            TableName: !Ref BankingSvcOperationsCommandsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref AccountsProjectionTable
+            TableName: !Ref BankingSvcAccountsProjectionTable
         - SQSPollerPolicy:
             QueueName: !GetAtt EventsQueue.QueueName
       Events:
