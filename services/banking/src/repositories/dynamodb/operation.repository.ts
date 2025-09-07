@@ -1,7 +1,8 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Operation } from '@digital-banking/models';
+import { DepositCommand, WithdrawCommand } from '@digital-banking/commands';
 import { IOperationRepository } from '../interfaces';
 
 const logger = new Logger();
@@ -12,33 +13,13 @@ const logger = new Logger();
 export class OperationRepository implements IOperationRepository {
   private dynamoClient: DynamoDBDocumentClient;
   private tableName: string;
+  private outboxTableName: string;
 
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
     this.dynamoClient = DynamoDBDocumentClient.from(client);
     this.tableName = process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
-  }
-
-  /**
-   * Create a new operation record
-   */
-  async create(operation: Operation): Promise<void> {
-    try {
-      const command = new PutCommand({
-        TableName: this.tableName,
-        Item: operation
-      });
-
-      await this.dynamoClient.send(command);
-      logger.info('Operation record created', { 
-        operationId: operation.operationId, 
-        type: operation.type, 
-        accountId: operation.accountId 
-      });
-    } catch (error) {
-      logger.error('Error creating operation record', { error, operation });
-      throw error;
-    }
+    this.outboxTableName = process.env.BANKING_OUTBOX_TABLE || `BankingSvc-OutboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**
@@ -105,6 +86,51 @@ export class OperationRepository implements IOperationRepository {
       logger.info('Operation updated', { operationId, status });
     } catch (error) {
       logger.error('Error updating operation', { error, operationId, status });
+      throw error;
+    }
+  }
+
+  /**
+   * Create operation and send command atomically using outbox pattern
+   */
+  async createWithCommand(operation: Operation, command: DepositCommand | WithdrawCommand): Promise<void> {
+    try {
+      // Create outbox item
+      const outboxItem = {
+        id: command.id,
+        timestamp: command.timestamp,
+        eventType: command.type,
+        eventData: command,
+        processed: false
+      };
+
+      // Atomic transaction: Write to both operations table and outbox table
+      const transactCommand = new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: this.tableName,
+              Item: operation
+            }
+          },
+          {
+            Put: {
+              TableName: this.outboxTableName,
+              Item: outboxItem
+            }
+          }
+        ]
+      });
+
+      await this.dynamoClient.send(transactCommand);
+      logger.info('Operation created atomically with command outbox', { 
+        operationId: operation.operationId, 
+        type: operation.type, 
+        accountId: operation.accountId, 
+        commandId: command.id 
+      });
+    } catch (error) {
+      logger.error('Error creating operation with command outbox', { error, operation, command });
       throw error;
     }
   }

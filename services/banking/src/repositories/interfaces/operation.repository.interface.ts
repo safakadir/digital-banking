@@ -1,15 +1,10 @@
 import { Operation } from '@digital-banking/models';
+import { DepositCommand, WithdrawCommand } from '@digital-banking/commands';
 
 /**
  * Interface for operation repository
  */
 export interface IOperationRepository {
-  /**
-   * Create a new operation record
-   * @param operation - Operation to create
-   */
-  create(operation: Operation): Promise<void>;
-
   /**
    * Get operation by ID
    * @param operationId - Operation ID
@@ -28,4 +23,11 @@ export interface IOperationRepository {
     status: 'pending' | 'completed' | 'failed',
     errorMessage?: string
   ): Promise<void>;
+
+  /**
+   * Create operation and send command atomically using outbox pattern
+   * @param operation - Operation to create
+   * @param command - Command to send via outbox
+   */
+  createWithCommand(operation: Operation, command: DepositCommand | WithdrawCommand): Promise<void>;
 }

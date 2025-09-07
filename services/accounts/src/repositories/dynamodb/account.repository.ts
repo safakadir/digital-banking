@@ -1,7 +1,8 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Account, AccountStatus } from '@digital-banking/models';
+import { CreateAccountEvent, CloseAccountEvent } from '@digital-banking/events';
 import { IAccountRepository } from '../interfaces';
 
 const logger = new Logger();
@@ -12,30 +13,13 @@ const logger = new Logger();
 export class AccountRepository implements IAccountRepository {
   private dynamoClient: DynamoDBDocumentClient;
   private tableName: string;
+  private outboxTableName: string;
 
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
     this.dynamoClient = DynamoDBDocumentClient.from(client);
     this.tableName = process.env.ACCOUNTS_TABLE_NAME || `AccountsSvc-AccountsTable-${process.env.ENV || 'dev'}`;
-  }
-
-  /**
-   * Create a new account
-   */
-  async create(account: Account): Promise<void> {
-    try {
-      const command = new PutCommand({
-        TableName: this.tableName,
-        Item: account,
-        ConditionExpression: 'attribute_not_exists(accountId)' // Prevent overwriting existing accounts
-      });
-
-      await this.dynamoClient.send(command);
-      logger.info('Account created', { accountId: account.accountId });
-    } catch (error) {
-      logger.error('Error creating account', { error, accountId: account.accountId });
-      throw error;
-    }
+    this.outboxTableName = process.env.ACCOUNTS_OUTBOX_TABLE || `AccountsSvc-OutboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**
@@ -89,12 +73,62 @@ export class AccountRepository implements IAccountRepository {
   }
 
   /**
-   * Update account status
+   * Create account and publish event atomically using outbox pattern
    */
-  async updateStatus(accountId: string, status: AccountStatus, closedAt?: string): Promise<void> {
+  async createWithEvent(account: Account, event: CreateAccountEvent): Promise<void> {
+    try {
+      // Create outbox item
+      const outboxItem = {
+        id: event.id,
+        timestamp: event.timestamp,
+        eventType: event.type,
+        eventData: event,
+        processed: false
+      };
+
+      // Atomic transaction: Write to both accounts table and outbox table
+      const transactCommand = new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: this.tableName,
+              Item: account,
+              ConditionExpression: 'attribute_not_exists(accountId)' // Prevent overwriting existing accounts
+            }
+          },
+          {
+            Put: {
+              TableName: this.outboxTableName,
+              Item: outboxItem
+            }
+          }
+        ]
+      });
+
+      await this.dynamoClient.send(transactCommand);
+      logger.info('Account created atomically with outbox event', { accountId: account.accountId, eventId: event.id });
+    } catch (error) {
+      logger.error('Error creating account with outbox event', { error, accountId: account.accountId });
+      throw error;
+    }
+  }
+
+  /**
+   * Update account status and publish event atomically using outbox pattern
+   */
+  async updateStatusWithEvent(accountId: string, status: AccountStatus, event: CloseAccountEvent, closedAt?: string): Promise<void> {
     try {
       const now = new Date().toISOString();
       
+      // Create outbox item
+      const outboxItem = {
+        id: event.id,
+        timestamp: event.timestamp,
+        eventType: event.type,
+        eventData: event,
+        processed: false
+      };
+
       let updateExpression = 'SET #status = :status, #updatedAt = :updatedAt';
       const expressionAttributeNames: Record<string, string> = {
         '#status': 'status',
@@ -111,91 +145,31 @@ export class AccountRepository implements IAccountRepository {
         expressionAttributeValues[':closedAt'] = closedAt;
       }
 
-      const command = new UpdateCommand({
-        TableName: this.tableName,
-        Key: { accountId },
-        UpdateExpression: updateExpression,
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues
-      });
-      
-      await this.dynamoClient.send(command);
-      logger.info('Account status updated', { accountId, status, closedAt });
-    } catch (error) {
-      logger.error('Error updating account status', { error, accountId, status });
-      throw error;
-    }
-  }
-
-  /**
-   * Update account
-   */
-  async update(accountId: string, updates: Partial<Account>): Promise<void> {
-    try {
-      const now = new Date().toISOString();
-      const updateExpressions: string[] = [];
-      const expressionAttributeNames: Record<string, string> = {};
-      const expressionAttributeValues: Record<string, any> = {};
-
-      // Always update the updatedAt timestamp
-      updateExpressions.push('#updatedAt = :updatedAt');
-      expressionAttributeNames['#updatedAt'] = 'updatedAt';
-      expressionAttributeValues[':updatedAt'] = now;
-
-      // Add other fields to update
-      Object.entries(updates).forEach(([key, value], index) => {
-        if (key !== 'accountId' && key !== 'updatedAt' && value !== undefined) {
-          const attrName = `#attr${index}`;
-          const attrValue = `:val${index}`;
-          updateExpressions.push(`${attrName} = ${attrValue}`);
-          expressionAttributeNames[attrName] = key;
-          expressionAttributeValues[attrValue] = value;
-        }
+      // Atomic transaction: Update account status and write to outbox table
+      const transactCommand = new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: this.tableName,
+              Key: { accountId },
+              UpdateExpression: updateExpression,
+              ExpressionAttributeNames: expressionAttributeNames,
+              ExpressionAttributeValues: expressionAttributeValues
+            }
+          },
+          {
+            Put: {
+              TableName: this.outboxTableName,
+              Item: outboxItem
+            }
+          }
+        ]
       });
 
-      const command = new UpdateCommand({
-        TableName: this.tableName,
-        Key: { accountId },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues
-      });
-      
-      await this.dynamoClient.send(command);
-      logger.info('Account updated', { accountId, updates: Object.keys(updates) });
+      await this.dynamoClient.send(transactCommand);
+      logger.info('Account status updated atomically with outbox event', { accountId, status, eventId: event.id });
     } catch (error) {
-      logger.error('Error updating account', { error, accountId, updates });
-      throw error;
-    }
-  }
-
-  /**
-   * Delete account (for hard deletes if needed)
-   */
-  async delete(accountId: string): Promise<void> {
-    try {
-      const command = new DeleteCommand({
-        TableName: this.tableName,
-        Key: { accountId }
-      });
-
-      await this.dynamoClient.send(command);
-      logger.info('Account deleted', { accountId });
-    } catch (error) {
-      logger.error('Error deleting account', { error, accountId });
-      throw error;
-    }
-  }
-
-  /**
-   * Check if account exists
-   */
-  async exists(accountId: string): Promise<boolean> {
-    try {
-      const account = await this.getById(accountId);
-      return account !== null;
-    } catch (error) {
-      logger.error('Error checking account existence', { error, accountId });
+      logger.error('Error updating account status with outbox event', { error, accountId, status });
       throw error;
     }
   }

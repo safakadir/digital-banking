@@ -1,5 +1,4 @@
 import { Logger } from '@aws-lambda-powertools/logger';
-import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   DepositEvent, 
@@ -22,9 +21,6 @@ const logger = new Logger();
  * Banking Service - Business logic for banking operations
  */
 export class BankingService {
-  private sqsClient: SQSClient;
-  private depositCommandQueueUrl: string;
-  private withdrawCommandQueueUrl: string;
   private operationRepository: IOperationRepository;
   private accountsProjectionRepository: IAccountsProjectionRepository;
 
@@ -32,17 +28,9 @@ export class BankingService {
     operationRepository: IOperationRepository,
     accountsProjectionRepository: IAccountsProjectionRepository
   ) {
-    // Initialize AWS clients
-    const region = process.env.AWS_REGION || 'us-east-1';
-    this.sqsClient = new SQSClient({ region });
-
     // Inject repositories
     this.operationRepository = operationRepository;
     this.accountsProjectionRepository = accountsProjectionRepository;
-
-    // Get queue URLs from environment variables
-    this.depositCommandQueueUrl = process.env.DEPOSIT_COMMAND_QUEUE_URL || '';
-    this.withdrawCommandQueueUrl = process.env.WITHDRAW_COMMAND_QUEUE_URL || '';
   }
 
   /**
@@ -66,11 +54,12 @@ export class BankingService {
   }
 
   /**
-   * Create operation record in DynamoDB
+   * Create operation record and send command atomically using outbox pattern
    */
-  private async createOperationRecord(
+  private async createOperationWithCommand(
     operationId: string,
     accountId: string,
+    userId: string,
     type: 'deposit' | 'withdraw',
     amount: number
   ): Promise<void> {
@@ -85,27 +74,38 @@ export class BankingService {
       createdAt: timestamp
     };
 
-    await this.operationRepository.create(operation);
-    logger.info('Operation record created', { operationId, type, accountId, amount });
-  }
+    // Create command for outbox
+    const command = type === 'deposit' 
+      ? ({
+          id: uuidv4(),
+          type: 'DEPOSIT_CMD',
+          timestamp,
+          accountId,
+          userId,
+          amount,
+          operationId,
+          description: 'Deposit operation'
+        } as DepositCommand)
+      : ({
+          id: uuidv4(),
+          type: 'WITHDRAW_CMD',
+          timestamp,
+          accountId,
+          userId,
+          amount,
+          operationId,
+          description: 'Withdraw operation'
+        } as WithdrawCommand);
 
-  /**
-   * Send command to SQS queue
-   */
-  private async sendCommand(command: DepositCommand | WithdrawCommand): Promise<void> {
-    const queueUrl = command.type === 'DEPOSIT_CMD' 
-      ? this.depositCommandQueueUrl 
-      : this.withdrawCommandQueueUrl;
-
-    const sqsCommand = new SendMessageCommand({
-      QueueUrl: queueUrl,
-      MessageBody: JSON.stringify(command),
-      MessageGroupId: command.accountId, // For FIFO ordering by account
-      MessageDeduplicationId: command.operationId
+    // Use repository transaction method for atomic operation
+    await this.operationRepository.createWithCommand(operation, command);
+    logger.info('Operation created successfully via repository', { 
+      operationId, 
+      type, 
+      accountId, 
+      amount, 
+      commandId: command.id 
     });
-
-    await this.sqsClient.send(sqsCommand);
-    logger.info('Command sent to SQS', { commandType: command.type, operationId: command.operationId });
   }
 
   /**
@@ -228,22 +228,8 @@ export class BankingService {
       // 2. Generate operation ID
       const operationId = uuidv4();
       
-      // 3. Create operation record
-      await this.createOperationRecord(operationId, accountId, 'deposit', amount);
-      
-      // 4. Create and send deposit command to SQS
-      const depositCommand: DepositCommand = {
-        id: uuidv4(),
-        type: 'DEPOSIT_CMD',
-        timestamp: new Date().toISOString(),
-        accountId,
-        userId,
-        amount,
-        operationId,
-        description: 'Deposit operation'
-      };
-      
-      await this.sendCommand(depositCommand);
+      // 3. Create operation record and send command atomically via outbox
+      await this.createOperationWithCommand(operationId, accountId, userId, 'deposit', amount);
       
       logger.info('Deposit processing completed', { operationId, accountId, amount });
       
@@ -270,22 +256,8 @@ export class BankingService {
       // 2. Generate operation ID
       const operationId = uuidv4();
       
-      // 3. Create operation record
-      await this.createOperationRecord(operationId, accountId, 'withdraw', amount);
-      
-      // 4. Create and send withdraw command to SQS
-      const withdrawCommand: WithdrawCommand = {
-        id: uuidv4(),
-        type: 'WITHDRAW_CMD',
-        timestamp: new Date().toISOString(),
-        accountId,
-        userId,
-        amount,
-        operationId,
-        description: 'Withdraw operation'
-      };
-      
-      await this.sendCommand(withdrawCommand);
+      // 3. Create operation record and send command atomically via outbox
+      await this.createOperationWithCommand(operationId, accountId, userId, 'withdraw', amount);
       
       logger.info('Withdraw processing completed', { operationId, accountId, amount });
       

@@ -9,11 +9,7 @@ import {
   CreateAccountEvent, 
   CloseAccountEvent 
 } from '@digital-banking/events';
-import { 
-  EventPublisher 
-} from '@digital-banking/utils';
 import {
-  ValidationError,
   NotFoundError,
   ConflictError
 } from '@digital-banking/errors';
@@ -27,11 +23,9 @@ const logger = new Logger();
  */
 export class AccountService {
   private accountRepository: IAccountRepository;
-  private eventPublisher: EventPublisher;
 
   constructor(accountRepository: IAccountRepository) {
     this.accountRepository = accountRepository;
-    this.eventPublisher = new EventPublisher();
   }
 
   /**
@@ -54,26 +48,26 @@ export class AccountService {
       createdAt: now,
       updatedAt: now
     };
+
+    // Create event for outbox
+    const event: CreateAccountEvent = {
+      id: uuidv4(),
+      type: 'CREATE_ACCOUNT_EVENT',
+      timestamp: now,
+      accountId,
+      userId,
+      name: data.name,
+      currency: data.currency
+    };
     
     try {
-      await this.accountRepository.create(account);
-      
-      // Publish CREATE_ACCOUNT_EVENT
-      const event: CreateAccountEvent = {
-        id: uuidv4(),
-        type: 'CREATE_ACCOUNT_EVENT',
-        timestamp: now,
-        accountId,
-        userId,
-        name: data.name,
-        currency: data.currency
-      };
-      
-      await this.eventPublisher.publishEvent(event);
+      // Use repository transaction method for atomic operation
+      await this.accountRepository.createWithEvent(account, event);
+      logger.info('Account created successfully via repository', { accountId, eventId: event.id });
       
       return account;
     } catch (error) {
-      logger.error('Error creating account', { error });
+      logger.error('Error creating account', { error, accountId });
       throw new Error(`Failed to create account: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -99,23 +93,23 @@ export class AccountService {
     
     // Update account status in database
     const now = new Date().toISOString();
+
+    // Create event for outbox
+    const event: CloseAccountEvent = {
+      id: uuidv4(),
+      type: 'CLOSE_ACCOUNT_EVENT',
+      timestamp: now,
+      accountId,
+      userId: account.userId,
+      reason
+    };
     
     try {
-      await this.accountRepository.updateStatus(accountId, AccountStatus.CLOSED, now);
-      
-      // Publish CLOSE_ACCOUNT_EVENT
-      const event: CloseAccountEvent = {
-        id: uuidv4(),
-        type: 'CLOSE_ACCOUNT_EVENT',
-        timestamp: now,
-        accountId,
-        userId: account.userId,
-        reason
-      };
-      
-      await this.eventPublisher.publishEvent(event);
+      // Use repository transaction method for atomic operation
+      await this.accountRepository.updateStatusWithEvent(accountId, AccountStatus.CLOSED, event, now);
+      logger.info('Account closed successfully via repository', { accountId, eventId: event.id });
     } catch (error) {
-      logger.error('Error closing account', { error });
+      logger.error('Error closing account', { error, accountId });
       throw new Error(`Failed to close account: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

@@ -1,15 +1,10 @@
 import { Account, AccountStatus } from '@digital-banking/models';
+import { CreateAccountEvent, CloseAccountEvent } from '@digital-banking/events';
 
 /**
  * Interface for account repository
  */
 export interface IAccountRepository {
-  /**
-   * Create a new account
-   * @param account - Account data
-   */
-  create(account: Account): Promise<void>;
-
   /**
    * Get account by ID
    * @param accountId - Account ID
@@ -25,30 +20,18 @@ export interface IAccountRepository {
   getByUserId(userId: string): Promise<Account[]>;
 
   /**
-   * Update account status
+   * Create account and publish event atomically using outbox pattern
+   * @param account - Account data
+   * @param event - Create account event
+   */
+  createWithEvent(account: Account, event: CreateAccountEvent): Promise<void>;
+
+  /**
+   * Update account status and publish event atomically using outbox pattern
    * @param accountId - Account ID
    * @param status - New account status
+   * @param event - Close account event
    * @param closedAt - Optional closed timestamp
    */
-  updateStatus(accountId: string, status: AccountStatus, closedAt?: string): Promise<void>;
-
-  /**
-   * Update account
-   * @param accountId - Account ID
-   * @param updates - Partial account data to update
-   */
-  update(accountId: string, updates: Partial<Account>): Promise<void>;
-
-  /**
-   * Delete account (for hard deletes if needed)
-   * @param accountId - Account ID
-   */
-  delete(accountId: string): Promise<void>;
-
-  /**
-   * Check if account exists
-   * @param accountId - Account ID
-   * @returns True if account exists
-   */
-  exists(accountId: string): Promise<boolean>;
+  updateStatusWithEvent(accountId: string, status: AccountStatus, event: CloseAccountEvent, closedAt?: string): Promise<void>;
 }
