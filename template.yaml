@@ -151,9 +151,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
       KeySchema:
         - AttributeName: id
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   AccountsSvcOutboxTable:
     Type: AWS::DynamoDB::Table
@@ -194,9 +203,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: account_id
           AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
       KeySchema:
         - AttributeName: account_id
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   QuerySvcAccountsProjectionTable:
     Type: AWS::DynamoDB::Table
@@ -206,9 +224,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
       KeySchema:
         - AttributeName: id
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   # Banking Service Tables
   BankingSvcOperationsTable:
@@ -231,9 +258,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
       KeySchema:
         - AttributeName: id
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   BankingSvcOutboxTable:
     Type: AWS::DynamoDB::Table
@@ -403,6 +439,8 @@ Resources:
       Environment:
         Variables:
           IDEMPOTENCY_TABLE: !Ref LedgerSvcCommandFnIdempotencyTable
+          LEDGER_TABLE_NAME: !Ref LedgerSvcLedgerTable
+          OUTBOX_TABLE_NAME: !Ref LedgerSvcOutboxTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref LedgerSvcLedgerTable
@@ -436,6 +474,9 @@ Resources:
     Properties:
       CodeUri: services/accounts/dist
       Handler: index.apiFunctionHandler
+      Environment:
+        Variables:
+          ACCOUNTS_TABLE_NAME: !Ref AccountsSvcAccountsTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref AccountsSvcAccountsTable
@@ -473,6 +514,11 @@ Resources:
     Properties:
       CodeUri: services/query/dist
       Handler: index.apiFunctionHandler
+      Environment:
+        Variables:
+          TRANSACTIONS_TABLE_NAME: !Ref QuerySvcTransactionsTable
+          BALANCES_TABLE_NAME: !Ref QuerySvcBalancesTable
+          ACCOUNTS_PROJECTION_TABLE_NAME: !Ref QuerySvcAccountsProjectionTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref QuerySvcTransactionsTable
@@ -534,6 +580,13 @@ Resources:
     Properties:
       CodeUri: services/banking/dist
       Handler: index.apiFunctionHandler
+      Environment:
+        Variables:
+          OPERATIONS_TABLE_NAME: !Ref BankingSvcOperationsTable
+          OUTBOX_TABLE_NAME: !Ref BankingSvcOutboxTable
+          ACCOUNTS_PROJECTION_TABLE_NAME: !Ref BankingSvcAccountsProjectionTable
+          DEPOSIT_COMMAND_QUEUE_URL: !Ref DepositCommandQueue
+          WITHDRAW_COMMAND_QUEUE_URL: !Ref WithdrawCommandQueue
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref BankingSvcOperationsTable
