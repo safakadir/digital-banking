@@ -3,7 +3,7 @@ export * from './account';
 export * from './success-response';
 export * from './error-response';
 export * from './operation-initiated-response';
-export * from './operation-status';
+export * from './operation';
 export * from './transaction';
 export * from './transactions-response';
 export * from './balance';

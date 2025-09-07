@@ -1,12 +1,14 @@
 import { AccountService } from "./account-service";
+import { AccountRepository } from "../repositories";
 
 /**
- * Creates a BankingService instance
+ * Creates an AccountService instance with its dependencies
  * This factory function allows for easier mocking in tests
- * @returns BankingService instance
+ * @returns AccountService instance
  */
 export function createAccountService(): AccountService {
-  return new AccountService();
+  const accountRepository = new AccountRepository();
+  return new AccountService(accountRepository);
 }
 
 // Export service classes for direct usage if needed

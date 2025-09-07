@@ -10,7 +10,6 @@ import {
   CloseAccountEvent 
 } from '@digital-banking/events';
 import { 
-  DynamoDBUtil,
   EventPublisher 
 } from '@digital-banking/utils';
 import {
@@ -18,6 +17,7 @@ import {
   NotFoundError,
   ConflictError
 } from '@digital-banking/errors';
+import { IAccountRepository } from '../repositories';
 
 // Powertools
 const logger = new Logger();
@@ -26,14 +26,12 @@ const logger = new Logger();
  * Account Service - Business logic for account operations
  */
 export class AccountService {
-  private dynamoDb: DynamoDBUtil;
+  private accountRepository: IAccountRepository;
   private eventPublisher: EventPublisher;
-  private accountsTableName: string;
 
-  constructor() {
-    this.dynamoDb = new DynamoDBUtil();
+  constructor(accountRepository: IAccountRepository) {
+    this.accountRepository = accountRepository;
     this.eventPublisher = new EventPublisher();
-    this.accountsTableName = process.env.ACCOUNTS_TABLE_NAME || 'Accounts';
   }
 
   /**
@@ -58,7 +56,7 @@ export class AccountService {
     };
     
     try {
-      await this.dynamoDb.putItem(this.accountsTableName, account);
+      await this.accountRepository.create(account);
       
       // Publish CREATE_ACCOUNT_EVENT
       const event: CreateAccountEvent = {
@@ -87,7 +85,7 @@ export class AccountService {
     logger.info('Closing account in service', { accountId });
     
     // Get account from database
-    const account = await this.getAccountFromDb(accountId);
+    const account = await this.accountRepository.getById(accountId);
     
     // These checks should be moved to validators, but keeping minimal validation
     // for data integrity at the service level
@@ -103,21 +101,7 @@ export class AccountService {
     const now = new Date().toISOString();
     
     try {
-      await this.dynamoDb.updateItem(
-        this.accountsTableName,
-        { accountId },
-        'SET #status = :status, #updatedAt = :updatedAt, #closedAt = :closedAt',
-        {
-          ':status': AccountStatus.CLOSED,
-          ':updatedAt': now,
-          ':closedAt': now
-        },
-        {
-          '#status': 'status',
-          '#updatedAt': 'updatedAt',
-          '#closedAt': 'closedAt'
-        }
-      );
+      await this.accountRepository.updateStatus(accountId, AccountStatus.CLOSED, now);
       
       // Publish CLOSE_ACCOUNT_EVENT
       const event: CloseAccountEvent = {
@@ -142,7 +126,7 @@ export class AccountService {
   async getAccount(accountId: string): Promise<Account> {
     logger.info('Getting account details in service', { accountId });
     
-    const account = await this.getAccountFromDb(accountId);
+    const account = await this.accountRepository.getById(accountId);
     
     // Keeping this check for data integrity
     if (!account) {
@@ -160,32 +144,13 @@ export class AccountService {
     
     try {
       // Query accounts by userId
-      const accounts = await this.dynamoDb.query<Account>({
-        TableName: this.accountsTableName,
-        IndexName: 'UserIdIndex', // Assuming a GSI on userId
-        KeyConditionExpression: 'userId = :userId',
-        ExpressionAttributeValues: {
-          ':userId': userId
-        }
-      });
+      const accounts = await this.accountRepository.getByUserId(userId);
       
       // Return full accounts
       return { accounts };
     } catch (error) {
       logger.error('Error getting accounts', { error });
       throw new Error(`Failed to get accounts: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-  
-  /**
-   * Helper method to get account from database
-   */
-  private async getAccountFromDb(accountId: string): Promise<Account | undefined> {
-    try {
-      return await this.dynamoDb.getItem<Account>(this.accountsTableName, { accountId });
-    } catch (error) {
-      logger.error('Error fetching account from database', { accountId, error });
-      throw new Error(`Failed to fetch account: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

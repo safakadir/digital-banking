@@ -1,7 +1,7 @@
 import { commonApiMiddleware, validationMiddleware, errorHandlerMiddleware } from "@digital-banking/middleware";
 import { TelemetryBundle } from "@digital-banking/utils";
 import { GetAccountsResponse } from "../../dto";
-import { validateGetAccountsRequest } from "../../validators/account-validators";
+import { validateGetAccountsRequest } from "../../validators";
 import { AccountService } from "../../services";
 
 export const getAccountsHandler = (

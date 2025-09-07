@@ -3,7 +3,7 @@ import { createBankingService } from '../services';
 import { createDefaultTelemetryBundle } from '@digital-banking/utils';
 import { depositHandler } from './api-handlers/deposit-handler';
 import { withdrawHandler } from './api-handlers/withdraw-handler';
-import { operationStatusHandler } from './api-handlers/operation-status-handler';
+import { operationHandler } from './api-handlers/operation-handler';
 
 /**
  * Creates an API handler with dependency injection support
@@ -30,7 +30,7 @@ export function createApiFunctionHandler(
   {
     method: 'GET',
     path: '/operation-status/{operation_id}',
-    handler: operationStatusHandler(bankingService, telemetry)
+    handler: operationHandler(bankingService, telemetry)
   }
 ])};
 
