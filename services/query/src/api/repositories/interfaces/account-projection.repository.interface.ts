@@ -12,5 +12,5 @@ export interface IAccountProjectionRepository {
   /**
    * Get account projections for a user
    */
-  getByUserId(userId: string): Promise<AccountProjection[]>;
+  getActiveAccountsByUserId(userId: string): Promise<AccountProjection[]>;
 }

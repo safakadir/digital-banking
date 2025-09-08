@@ -56,21 +56,26 @@ export class AccountProjectionRepository implements IAccountProjectionRepository
   /**
    * Get account projections for a user
    */
-  async getByUserId(userId: string): Promise<AccountProjection[]> {
+  async getActiveAccountsByUserId(userId: string): Promise<AccountProjection[]> {
     try {
       const command = new QueryCommand({
         TableName: this.tableName,
         IndexName: 'UserIdIndex', // GSI on userId
         KeyConditionExpression: 'userId = :userId',
+        FilterExpression: '#status = :activeStatus',
+        ExpressionAttributeNames: {
+          '#status': 'status'
+        },
         ExpressionAttributeValues: {
-          ':userId': userId
+          ':userId': userId,
+          ':activeStatus': 'active'
         }
       });
 
       const result = await this.dynamoClient.send(command);
       const accounts = (result.Items || []) as AccountProjection[];
 
-      logger.info('Account projections retrieved for user', { userId, count: accounts.length });
+      logger.info('Active account projections retrieved for user', { userId, count: accounts.length });
       return accounts;
     } catch (error) {
       logger.error('Error getting account projections by user ID', { error, userId });

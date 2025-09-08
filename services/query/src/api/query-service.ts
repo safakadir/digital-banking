@@ -74,7 +74,7 @@ export class QueryService {
 
     try {
       // 1. Fetch all accounts for the user
-      const accountProjections = await this.accountProjectionRepository.getByUserId(userId);
+      const accountProjections = await this.accountProjectionRepository.getActiveAccountsByUserId(userId);
 
       if (accountProjections.length === 0) {
         logger.info('No accounts found for user', { userId });
