@@ -28,7 +28,7 @@ export class DepositCommandHandler {
       }
     });
     this.inboxTableName =
-      process.env.INBOX_TABLE || `LedgerSvc-InboxTable-${process.env.ENV || 'dev'}`;
+      process.env.LEDGER_INBOX_TABLE_NAME || `LedgerSvc-InboxTable-${process.env.ENV || 'dev'}`;
     this.ledgerTableName =
       process.env.LEDGER_TABLE_NAME || `LedgerSvc-LedgerTable-${process.env.ENV || 'dev'}`;
     this.balanceTableName =

@@ -25,7 +25,7 @@ export class OperationRepository implements IOperationRepository {
     this.tableName =
       process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
     this.outboxTableName =
-      process.env.BANKING_OUTBOX_TABLE || `BankingSvc-OutboxTable-${process.env.ENV || 'dev'}`;
+      process.env.BANKING_OUTBOX_TABLE_NAME || `BankingSvc-OutboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**
@@ -35,7 +35,7 @@ export class OperationRepository implements IOperationRepository {
     try {
       const command = new GetCommand({
         TableName: this.tableName,
-        Key: { id: operationId }
+        Key: { operationId: operationId }
       });
 
       const result = await this.dynamoClient.send(command);

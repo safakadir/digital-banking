@@ -470,7 +470,7 @@ Resources:
       Handler: index.commandFunctionHandler
       Environment:
         Variables:
-          INBOX_TABLE: !Ref LedgerSvcCommandFnInboxTable
+          LEDGER_INBOX_TABLE_NAME: !Ref LedgerSvcCommandFnInboxTable
           LEDGER_TABLE_NAME: !Ref LedgerSvcLedgerTable
           BALANCE_TABLE_NAME: !Ref LedgerSvcBalanceTable
           OUTBOX_TABLE_NAME: !Ref LedgerSvcOutboxTable
@@ -512,6 +512,7 @@ Resources:
       Environment:
         Variables:
           ACCOUNTS_TABLE_NAME: !Ref AccountsSvcAccountsTable
+          OUTBOX_TABLE_NAME: !Ref AccountsSvcOutboxTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref AccountsSvcAccountsTable
@@ -588,14 +589,10 @@ Resources:
       Handler: index.eventFunctionHandler
       Environment:
         Variables:
-          INBOX_TABLE: !Ref QuerySvcEventFnInboxTable
-          INBOX_TABLE_NAME: !Ref QuerySvcEventFnInboxTable
+          QUERY_INBOX_TABLE_NAME: !Ref QuerySvcEventFnInboxTable
           TRANSACTIONS_TABLE_NAME: !Ref QuerySvcTransactionsTable
-          TRANSACTION_TABLE_NAME: !Ref QuerySvcTransactionsTable
           BALANCES_TABLE_NAME: !Ref QuerySvcBalancesTable
-          BALANCE_TABLE_NAME: !Ref QuerySvcBalancesTable
           ACCOUNTS_PROJECTION_TABLE_NAME: !Ref QuerySvcAccountsProjectionTable
-          ACCOUNT_PROJECTION_TABLE_NAME: !Ref QuerySvcAccountsProjectionTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref QuerySvcTransactionsTable
@@ -667,7 +664,8 @@ Resources:
       Handler: index.eventFunctionHandler
       Environment:
         Variables:
-          BANKING_INBOX_TABLE: !Ref BankingSvcEventFnInboxTable
+          BANKING_INBOX_TABLE_NAME: !Ref BankingSvcEventFnInboxTable
+          OPERATIONS_TABLE_NAME: !Ref BankingSvcOperationsTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref BankingSvcOperationsTable

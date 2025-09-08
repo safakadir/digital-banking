@@ -17,7 +17,7 @@ export class CreateAccountEventHandler {
       }
     });
     this.inboxTableName =
-      process.env.BANKING_INBOX_TABLE || `BankingSvc-InboxTable-${process.env.ENV || 'dev'}`;
+      process.env.BANKING_INBOX_TABLE_NAME || `BankingSvc-InboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**

@@ -30,7 +30,7 @@ export class AccountRepository implements IAccountRepository {
     this.tableName =
       process.env.ACCOUNTS_TABLE_NAME || `AccountsSvc-AccountsTable-${process.env.ENV || 'dev'}`;
     this.outboxTableName =
-      process.env.ACCOUNTS_OUTBOX_TABLE || `AccountsSvc-OutboxTable-${process.env.ENV || 'dev'}`;
+      process.env.ACCOUNTS_OUTBOX_TABLE_NAME || `AccountsSvc-OutboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**

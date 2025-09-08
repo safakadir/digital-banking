@@ -11,7 +11,7 @@ export class CloseAccountEventHandler {
   constructor(private readonly telemetry: TelemetryBundle) {
     this.dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient());
     this.inboxTableName = 
-      process.env.INBOX_TABLE_NAME || `QuerySvc-InboxTable-${process.env.ENV || 'dev'}`;
+      process.env.QUERY_INBOX_TABLE_NAME || `QuerySvc-InboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**
@@ -29,7 +29,7 @@ export class CloseAccountEventHandler {
     const ttl = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours TTL
 
     const accountProjectionTableName = 
-      process.env.ACCOUNT_PROJECTION_TABLE_NAME || 
+      process.env.ACCOUNTS_PROJECTION_TABLE_NAME || 
       `QuerySvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
 
     const inboxItem: InboxItem = {
