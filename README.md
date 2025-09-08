@@ -68,8 +68,16 @@ npm run deploy
 ## Authentication
 
 ```bash
+aws cognito-idp admin-set-user-password \
+  --user-pool-id <USER_POOL_ID> \
+  --username test@mail.com \
+  --password Aa123456 \
+  --permanent
+```
+
+```bash
 aws cognito-idp initiate-auth \
-  --client-id 3qacpltbnk17amkk52urt40r3 \
+  --client-id <CLIENT_ID> \
   --auth-flow USER_PASSWORD_AUTH \
   --auth-parameters USERNAME=test@mail.com,PASSWORD=Aa123456
 ```

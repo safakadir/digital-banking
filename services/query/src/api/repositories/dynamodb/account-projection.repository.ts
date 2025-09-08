@@ -19,7 +19,11 @@ export class AccountProjectionRepository implements IAccountProjectionRepository
 
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
+    this.dynamoClient = DynamoDBDocumentClient.from(client, {
+      marshallOptions: {
+        removeUndefinedValues: true
+      }
+    });
     this.tableName =
       process.env.ACCOUNTS_PROJECTION_TABLE_NAME || `QuerySvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
   }

@@ -11,7 +11,11 @@ export class CreateAccountEventHandler {
   constructor(private readonly telemetry: TelemetryBundle) {
     // Initialize DynamoDB client for transactions
     const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
+    this.dynamoClient = DynamoDBDocumentClient.from(client, {
+      marshallOptions: {
+        removeUndefinedValues: true
+      }
+    });
     this.inboxTableName =
       process.env.BANKING_INBOX_TABLE || `BankingSvc-InboxTable-${process.env.ENV || 'dev'}`;
   }
@@ -55,8 +59,8 @@ export class CreateAccountEventHandler {
             Put: {
               TableName: accountsProjectionTableName,
               Item: {
-                id: event.accountId,
-                user_id: event.userId,
+                accountId: event.accountId,
+                userId: event.userId,
                 status: AccountStatus.ACTIVE
               }
             }

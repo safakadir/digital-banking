@@ -21,7 +21,11 @@ export class BalanceRepository implements IBalanceRepository {
 
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
+    this.dynamoClient = DynamoDBDocumentClient.from(client, {
+      marshallOptions: {
+        removeUndefinedValues: true
+      }
+    });
     this.tableName =
       process.env.BALANCES_TABLE_NAME || `QuerySvc-BalancesTable-${process.env.ENV || 'dev'}`;
   }

@@ -2,20 +2,19 @@ openapi: 3.0.3
 info:
   title: Digital Banking Platform API
   description: |
-    Event-driven microservices architecture için dijital bankacılık platformu API'si.
+    Digital banking platform API for event-driven microservices architecture.
     
     ## Authentication
-    Tüm endpoint'ler AWS Cognito JWT token gerektirmektedir.
+    All endpoints require AWS Cognito JWT token authentication.
     
     ## Architecture
-    Bu API event-driven microservices mimarisi kullanır:
-    - **Accounts Service**: Hesap yönetimi
-    - **Banking Service**: Para yatırma/çekme işlemleri
-    - **Query Service**: Bakiye ve işlem geçmişi sorguları
-    - **Ledger Service**: İşlem kayıtları (asenkron)
+    This API uses event-driven microservices architecture:
+    - **Accounts Service**: Account management
+    - **Banking Service**: Deposit and withdrawal operations
+    - **Query Service**: Balance and transaction history queries
     
-    ## Asenkron İşlemler
-    Para yatırma ve çekme işlemleri asenkron olarak işlenir. İşlem durumunu kontrol etmek için `/operation-status/{operation_id}` endpoint'ini kullanın.
+    ## Asynchronous Operations
+    Deposit and withdrawal operations are processed asynchronously. Use the `/operation-status/{operation_id}` endpoint to check operation status.
   version: 1.0.0
   contact:
     name: Digital Banking Platform
@@ -48,8 +47,8 @@ paths:
     post:
       tags:
         - Accounts
-      summary: Yeni hesap oluştur
-      description: Kullanıcı için yeni bir banka hesabı oluşturur
+      summary: Create new account
+      description: Creates a new bank account for the user
       requestBody:
         required: true
         content:
@@ -57,11 +56,11 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateAccountRequest'
             example:
-              name: "Ana Hesap"
+              name: "Main Account"
               currency: "TRY"
       responses:
         '201':
-          description: Hesap başarıyla oluşturuldu
+          description: Account created successfully
           content:
             application/json:
               schema:
@@ -72,7 +71,7 @@ paths:
                 message: "Account created successfully"
                 accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
                 userId: "us-east-1:12345678-1234-1234-1234-123456789012"
-                name: "Ana Hesap"
+                name: "Main Account"
                 currency: "TRY"
                 status: "active"
                 createdAt: "2024-01-15T10:30:00Z"
@@ -87,11 +86,11 @@ paths:
     get:
       tags:
         - Accounts
-      summary: Kullanıcının tüm hesaplarını listele
-      description: Giriş yapan kullanıcının tüm hesaplarını getirir
+      summary: List all user accounts
+      description: Retrieves all accounts for the authenticated user
       responses:
         '200':
-          description: Hesaplar başarıyla getirildi
+          description: Accounts retrieved successfully
           content:
             application/json:
               schema:
@@ -101,14 +100,14 @@ paths:
               example:
                 - accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
                   userId: "us-east-1:12345678-1234-1234-1234-123456789012"
-                  name: "Ana Hesap"
+                  name: "Main Account"
                   currency: "TRY"
                   status: "active"
                   createdAt: "2024-01-15T10:30:00Z"
                   updatedAt: "2024-01-15T10:30:00Z"
                 - accountId: "acc_2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p1a"
                   userId: "us-east-1:12345678-1234-1234-1234-123456789012"
-                  name: "USD Hesap"
+                  name: "USD Account"
                   currency: "USD"
                   status: "active"
                   createdAt: "2024-01-16T14:20:00Z"
@@ -122,13 +121,13 @@ paths:
     get:
       tags:
         - Accounts
-      summary: Hesap detaylarını getir
-      description: Belirtilen hesabın detaylı bilgilerini getirir
+      summary: Get account details
+      description: Retrieves detailed information for the specified account
       parameters:
         - $ref: '#/components/parameters/AccountId'
       responses:
         '200':
-          description: Hesap detayları başarıyla getirildi
+          description: Account details retrieved successfully
           content:
             application/json:
               schema:
@@ -136,7 +135,7 @@ paths:
               example:
                 accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
                 userId: "us-east-1:12345678-1234-1234-1234-123456789012"
-                name: "Ana Hesap"
+                name: "Main Account"
                 currency: "TRY"
                 status: "active"
                 createdAt: "2024-01-15T10:30:00Z"
@@ -154,13 +153,13 @@ paths:
     put:
       tags:
         - Accounts
-      summary: Hesabı kapat
-      description: Belirtilen hesabı kapatır
+      summary: Close account
+      description: Closes the specified account
       parameters:
         - $ref: '#/components/parameters/AccountId'
       responses:
         '200':
-          description: Hesap başarıyla kapatıldı
+          description: Account closed successfully
           content:
             application/json:
               schema:
@@ -188,10 +187,10 @@ paths:
     post:
       tags:
         - Banking
-      summary: Para yatırma işlemi
+      summary: Deposit operation
       description: |
-        Belirtilen hesaba para yatırma işlemi başlatır. 
-        İşlem asenkron olarak gerçekleşir ve durumu `/operation-status/{operation_id}` endpoint'i ile takip edilebilir.
+        Initiates a deposit operation to the specified account. 
+        The operation is processed asynchronously and its status can be tracked using the `/operation-status/{operation_id}` endpoint.
       requestBody:
         required: true
         content:
@@ -203,7 +202,7 @@ paths:
               amount: 1000.50
       responses:
         '202':
-          description: Para yatırma işlemi başlatıldı
+          description: Deposit operation initiated
           content:
             application/json:
               schema:
@@ -225,10 +224,10 @@ paths:
     post:
       tags:
         - Banking
-      summary: Para çekme işlemi
+      summary: Withdrawal operation
       description: |
-        Belirtilen hesaptan para çekme işlemi başlatır. 
-        İşlem asenkron olarak gerçekleşir ve durumu `/operation-status/{operation_id}` endpoint'i ile takip edilebilir.
+        Initiates a withdrawal operation from the specified account. 
+        The operation is processed asynchronously and its status can be tracked using the `/operation-status/{operation_id}` endpoint.
       requestBody:
         required: true
         content:
@@ -240,7 +239,7 @@ paths:
               amount: 500.25
       responses:
         '202':
-          description: Para çekme işlemi başlatıldı
+          description: Withdrawal operation initiated
           content:
             application/json:
               schema:
@@ -264,13 +263,13 @@ paths:
     get:
       tags:
         - Banking
-      summary: İşlem durumunu sorgula
-      description: Belirtilen işlemin durumunu getirir
+      summary: Get operation status
+      description: Retrieves the status of the specified operation
       parameters:
         - $ref: '#/components/parameters/OperationId'
       responses:
         '200':
-          description: İşlem durumu başarıyla getirildi
+          description: Operation status retrieved successfully
           content:
             application/json:
               schema:
@@ -296,13 +295,13 @@ paths:
     get:
       tags:
         - Query
-      summary: Hesap işlem geçmişini getir
-      description: Belirtilen hesabın tüm işlem geçmişini getirir
+      summary: Get account transaction history
+      description: Retrieves all transaction history for the specified account
       parameters:
         - $ref: '#/components/parameters/AccountId'
       responses:
         '200':
-          description: İşlem geçmişi başarıyla getirildi
+          description: Transaction history retrieved successfully
           content:
             application/json:
               schema:
@@ -316,7 +315,7 @@ paths:
                     balance: 1000.50
                     status: "completed"
                     timestamp: "2024-01-15T10:30:00Z"
-                    description: "Para yatırma işlemi"
+                    description: "Deposit operation"
                   - id: "tx_2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p1a"
                     accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
                     type: "withdraw"
@@ -324,7 +323,7 @@ paths:
                     balance: 800.50
                     status: "completed"
                     timestamp: "2024-01-15T14:20:00Z"
-                    description: "Para çekme işlemi"
+                    description: "Withdrawal operation"
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -338,13 +337,13 @@ paths:
     get:
       tags:
         - Query
-      summary: Hesap bakiyesini getir
-      description: Belirtilen hesabın güncel bakiyesini getirir
+      summary: Get account balance
+      description: Retrieves the current balance for the specified account
       parameters:
         - $ref: '#/components/parameters/AccountId'
       responses:
         '200':
-          description: Hesap bakiyesi başarıyla getirildi
+          description: Account balance retrieved successfully
           content:
             application/json:
               schema:
@@ -367,11 +366,11 @@ paths:
     get:
       tags:
         - Query
-      summary: Kullanıcının tüm hesap bakiyelerini getir
-      description: Giriş yapan kullanıcının tüm hesaplarının bakiyelerini getirir
+      summary: Get all user account balances
+      description: Retrieves balances for all accounts of the authenticated user
       responses:
         '200':
-          description: Hesap bakiyeleri başarıyla getirildi
+          description: Account balances retrieved successfully
           content:
             application/json:
               schema:
@@ -380,12 +379,12 @@ paths:
                   $ref: '#/components/schemas/BalanceWithAccountInfo'
               example:
                 - accountId: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
-                  accountName: "Ana Hesap"
+                  accountName: "Main Account"
                   balance: 1250.75
                   currency: "TRY"
                   lastUpdated: "2024-01-15T14:20:00Z"
                 - accountId: "acc_2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p1a"
-                  accountName: "USD Hesap"
+                  accountName: "USD Account"
                   balance: 500.00
                   currency: "USD"
                   lastUpdated: "2024-01-16T09:15:00Z"
@@ -407,7 +406,7 @@ components:
       name: account_id
       in: path
       required: true
-      description: Hesap kimliği (acc_ prefixi ile başlayan 32 karakter hex)
+      description: Account ID (32-character hex string starting with acc_ prefix)
       schema:
         type: string
         pattern: '^acc_[a-f0-9]{32}$'
@@ -417,7 +416,7 @@ components:
       name: operation_id
       in: path
       required: true
-      description: İşlem kimliği
+      description: Operation ID
       schema:
         type: string
         example: "op_deposit_1a2b3c4d5e6f7g8h9i0j1k2l"
@@ -432,12 +431,12 @@ components:
         name:
           type: string
           minLength: 3
-          description: Hesap adı
-          example: "Ana Hesap"
+          description: Account name
+          example: "Main Account"
         currency:
           type: string
           pattern: '^[A-Z]{3}$'
-          description: Para birimi (ISO 4217 3-letter code)
+          description: Currency (ISO 4217 3-letter code)
           example: "TRY"
 
     Account:
@@ -446,37 +445,37 @@ components:
         accountId:
           type: string
           pattern: '^acc_[a-f0-9]{32}$'
-          description: Hesap kimliği
+          description: Account ID
           example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
         userId:
           type: string
-          description: Kullanıcı kimliği (Cognito sub)
+          description: User ID (Cognito sub)
           example: "us-east-1:12345678-1234-1234-1234-123456789012"
         name:
           type: string
-          description: Hesap adı
-          example: "Ana Hesap"
+          description: Account name
+          example: "Main Account"
         currency:
           type: string
-          description: Para birimi
+          description: Currency
           example: "TRY"
         status:
           $ref: '#/components/schemas/AccountStatus'
         createdAt:
           type: string
           format: date-time
-          description: Oluşturulma tarihi
+          description: Creation date
           example: "2024-01-15T10:30:00Z"
         updatedAt:
           type: string
           format: date-time
-          description: Güncellenme tarihi
+          description: Last updated date
           example: "2024-01-15T10:30:00Z"
         closedAt:
           type: string
           format: date-time
           nullable: true
-          description: Kapatılma tarihi
+          description: Closure date
           example: null
 
 
@@ -486,7 +485,7 @@ components:
         - active
         - closed
         - suspended
-      description: Hesap durumu
+      description: Account status
       example: "active"
 
     DepositRequest:
@@ -498,12 +497,12 @@ components:
         accountId:
           type: string
           pattern: '^acc_[a-f0-9]{32}$'
-          description: Hesap kimliği
+          description: Account ID
           example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
         amount:
           type: number
           minimum: 0.01
-          description: Yatırılacak miktar
+          description: Amount to deposit
           example: 1000.50
 
     WithdrawRequest:
@@ -515,12 +514,12 @@ components:
         accountId:
           type: string
           pattern: '^acc_[a-f0-9]{32}$'
-          description: Hesap kimliği
+          description: Account ID
           example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
         amount:
           type: number
           minimum: 0.01
-          description: Çekilecek miktar
+          description: Amount to withdraw
           example: 500.25
 
     OperationInitiatedResponse:
@@ -530,12 +529,12 @@ components:
           properties:
             operationId:
               type: string
-              description: İşlem kimliği
+              description: Operation ID
               example: "op_deposit_1a2b3c4d5e6f7g8h9i0j1k2l"
             status:
               type: string
               enum: [pending]
-              description: İşlem durumu
+              description: Operation status
               example: "pending"
 
     OperationStatus:
@@ -543,42 +542,42 @@ components:
       properties:
         operationId:
           type: string
-          description: İşlem kimliği
+          description: Operation ID
           example: "op_deposit_1a2b3c4d5e6f7g8h9i0j1k2l"
         accountId:
           type: string
           pattern: '^acc_[a-f0-9]{32}$'
-          description: Hesap kimliği
+          description: Account ID
           example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
         type:
           type: string
           enum: [deposit, withdraw]
-          description: İşlem tipi
+          description: Operation type
           example: "deposit"
         amount:
           type: number
-          description: İşlem miktarı
+          description: Operation amount
           example: 1000.50
         status:
           type: string
           enum: [pending, completed, failed]
-          description: İşlem durumu
+          description: Operation status
           example: "completed"
         createdAt:
           type: string
           format: date-time
-          description: İşlem başlatılma tarihi
+          description: Operation creation date
           example: "2024-01-15T10:30:00Z"
         completedAt:
           type: string
           format: date-time
           nullable: true
-          description: İşlem tamamlanma tarihi
+          description: Operation completion date
           example: "2024-01-15T10:30:05Z"
         errorMessage:
           type: string
           nullable: true
-          description: Hata mesajı (işlem başarısız olduğunda)
+          description: Error message (when operation fails)
           example: null
 
     TransactionsResponse:
@@ -594,40 +593,40 @@ components:
       properties:
         id:
           type: string
-          description: İşlem kimliği
+          description: Operation ID
           example: "tx_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
         accountId:
           type: string
           pattern: '^acc_[a-f0-9]{32}$'
-          description: Hesap kimliği
+          description: Account ID
           example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
         type:
           type: string
           enum: [deposit, withdraw]
-          description: İşlem tipi
+          description: Operation type
           example: "deposit"
         amount:
           type: number
-          description: İşlem miktarı
+          description: Operation amount
           example: 1000.50
         balance:
           type: number
-          description: İşlem sonrası bakiye
+          description: Balance after transaction
           example: 1000.50
         status:
           type: string
           enum: [completed, failed]
-          description: İşlem durumu
+          description: Operation status
           example: "completed"
         timestamp:
           type: string
           format: date-time
-          description: İşlem tarihi
+          description: Transaction date
           example: "2024-01-15T10:30:00Z"
         description:
           type: string
-          description: İşlem açıklaması
-          example: "Para yatırma işlemi"
+          description: Transaction description
+          example: "Deposit operation"
 
     Balance:
       type: object
@@ -635,20 +634,20 @@ components:
         accountId:
           type: string
           pattern: '^acc_[a-f0-9]{32}$'
-          description: Hesap kimliği
+          description: Account ID
           example: "acc_1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p"
         balance:
           type: number
-          description: Güncel bakiye
+          description: Current balance
           example: 1250.75
         currency:
           type: string
-          description: Para birimi
+          description: Currency
           example: "TRY"
         lastUpdated:
           type: string
           format: date-time
-          description: Son güncellenme tarihi
+          description: Last updated date
           example: "2024-01-15T14:20:00Z"
 
     BalanceWithAccountInfo:
@@ -658,15 +657,15 @@ components:
           properties:
             accountName:
               type: string
-              description: Hesap adı
-              example: "Ana Hesap"
+              description: Account name
+              example: "Main Account"
 
     SuccessResponse:
       type: object
       properties:
         message:
           type: string
-          description: Başarı mesajı
+          description: Success message
           example: "Operation completed successfully"
 
     ErrorResponse:
@@ -674,21 +673,21 @@ components:
       properties:
         message:
           type: string
-          description: Hata mesajı
+          description: Error message
           example: "Invalid request parameters"
         code:
           type: string
-          description: Hata kodu
+          description: Error code
           example: "VALIDATION_ERROR"
         timestamp:
           type: string
           format: date-time
-          description: Hata tarihi
+          description: Error timestamp
           example: "2024-01-15T10:30:00Z"
 
   responses:
     BadRequest:
-      description: Geçersiz istek parametreleri
+      description: Invalid request parameters
       content:
         application/json:
           schema:
@@ -699,7 +698,7 @@ components:
             timestamp: "2024-01-15T10:30:00Z"
 
     Unauthorized:
-      description: Geçersiz veya eksik kimlik doğrulama
+      description: Invalid or missing authentication
       content:
         application/json:
           schema:
@@ -710,7 +709,7 @@ components:
             timestamp: "2024-01-15T10:30:00Z"
 
     NotFound:
-      description: Kaynak bulunamadı
+      description: Resource not found
       content:
         application/json:
           schema:
@@ -721,7 +720,7 @@ components:
             timestamp: "2024-01-15T10:30:00Z"
 
     Conflict:
-      description: İş kuralı ihlali (örn: yetersiz bakiye)
+      description: Business rule violation (e.g., insufficient balance)
       content:
         application/json:
           schema:
@@ -732,7 +731,7 @@ components:
             timestamp: "2024-01-15T10:30:00Z"
 
     InternalServerError:
-      description: Sunucu hatası
+      description: Internal server error
       content:
         application/json:
           schema:
@@ -744,8 +743,8 @@ components:
 
 tags:
   - name: Accounts
-    description: Hesap yönetimi operasyonları
+    description: Account management operations
   - name: Banking
-    description: Para yatırma/çekme operasyonları
+    description: Deposit and withdrawal operations
   - name: Query
-    description: Bakiye ve işlem geçmişi sorguları
+    description: Balance and transaction history queries

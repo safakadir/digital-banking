@@ -19,7 +19,11 @@ export class TransactionRepository implements ITransactionRepository {
 
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
+    this.dynamoClient = DynamoDBDocumentClient.from(client, {
+      marshallOptions: {
+        removeUndefinedValues: true
+      }
+    });
     this.tableName =
       process.env.TRANSACTIONS_TABLE_NAME || `QuerySvc-TransactionsTable-${process.env.ENV || 'dev'}`;
   }

@@ -170,12 +170,12 @@ Resources:
       TableName: !Sub "AccountsSvc-AccountsTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: accountId
           AttributeType: S
         - AttributeName: userId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: accountId
           KeyType: HASH
       GlobalSecondaryIndexes:
         - IndexName: UserIdIndex
@@ -208,19 +208,19 @@ Resources:
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
-        - AttributeName: account_id
+        - AttributeName: accountId
           AttributeType: S
         - AttributeName: timestamp
           AttributeType: S
       KeySchema:
-        - AttributeName: account_id
+        - AttributeName: accountId
           KeyType: HASH
         - AttributeName: id
           KeyType: RANGE
       LocalSecondaryIndexes:
         - IndexName: account-timestamp-lsi
           KeySchema:
-            - AttributeName: account_id
+            - AttributeName: accountId
               KeyType: HASH
             - AttributeName: timestamp
               KeyType: RANGE
@@ -233,17 +233,17 @@ Resources:
       TableName: !Sub "QuerySvc-BalancesTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: account_id
+        - AttributeName: accountId
           AttributeType: S
-        - AttributeName: user_id
+        - AttributeName: userId
           AttributeType: S
       KeySchema:
-        - AttributeName: account_id
+        - AttributeName: accountId
           KeyType: HASH
       GlobalSecondaryIndexes:
         - IndexName: UserIdIndex
           KeySchema:
-            - AttributeName: user_id
+            - AttributeName: userId
               KeyType: HASH
           Projection:
             ProjectionType: ALL
@@ -254,17 +254,17 @@ Resources:
       TableName: !Sub "QuerySvc-AccountsProjectionTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: accountId
           AttributeType: S
-        - AttributeName: user_id
+        - AttributeName: userId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: accountId
           KeyType: HASH
       GlobalSecondaryIndexes:
         - IndexName: UserIdIndex
           KeySchema:
-            - AttributeName: user_id
+            - AttributeName: userId
               KeyType: HASH
           Projection:
             ProjectionType: ALL
@@ -288,17 +288,17 @@ Resources:
       TableName: !Sub "BankingSvc-AccountsProjectionTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: accountId
           AttributeType: S
-        - AttributeName: user_id
+        - AttributeName: userId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: accountId
           KeyType: HASH
       GlobalSecondaryIndexes:
         - IndexName: UserIdIndex
           KeySchema:
-            - AttributeName: user_id
+            - AttributeName: userId
               KeyType: HASH
           Projection:
             ProjectionType: ALL
@@ -529,7 +529,7 @@ Resources:
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /accounts/{account_id}/close
-            Method: post
+            Method: put
         GetAccount:
           Type: Api
           Properties:

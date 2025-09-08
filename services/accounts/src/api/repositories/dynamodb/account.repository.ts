@@ -22,7 +22,11 @@ export class AccountRepository implements IAccountRepository {
 
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
+    this.dynamoClient = DynamoDBDocumentClient.from(client, {
+      marshallOptions: {
+        removeUndefinedValues: true
+      }
+    });
     this.tableName =
       process.env.ACCOUNTS_TABLE_NAME || `AccountsSvc-AccountsTable-${process.env.ENV || 'dev'}`;
     this.outboxTableName =

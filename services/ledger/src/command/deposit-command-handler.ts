@@ -22,7 +22,11 @@ export class DepositCommandHandler {
   constructor(private readonly telemetry: TelemetryBundle) {
     // Initialize DynamoDB client for transactions
     const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
+    this.dynamoClient = DynamoDBDocumentClient.from(client, {
+      marshallOptions: {
+        removeUndefinedValues: true
+      }
+    });
     this.inboxTableName =
       process.env.INBOX_TABLE || `LedgerSvc-CommandFn-Inbox-${process.env.ENV || 'dev'}`;
     this.ledgerTableName =

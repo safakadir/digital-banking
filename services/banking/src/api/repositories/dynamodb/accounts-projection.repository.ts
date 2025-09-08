@@ -13,7 +13,11 @@ export class AccountsProjectionRepository implements IAccountsProjectionReposito
 
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
+    this.dynamoClient = DynamoDBDocumentClient.from(client, {
+      marshallOptions: {
+        removeUndefinedValues: true
+      }
+    });
     this.tableName =
       process.env.ACCOUNTS_PROJECTION_TABLE_NAME ||
       `BankingSvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
@@ -26,7 +30,7 @@ export class AccountsProjectionRepository implements IAccountsProjectionReposito
     try {
       const command = new GetCommand({
         TableName: this.tableName,
-        Key: { id: accountId }
+        Key: { accountId: accountId }
       });
 
       const result = await this.dynamoClient.send(command);
@@ -39,8 +43,8 @@ export class AccountsProjectionRepository implements IAccountsProjectionReposito
       // Map DynamoDB item to AccountProjection model
       const item = result.Item;
       const accountProjection: AccountProjection = {
-        accountId: item.id,
-        userId: item.user_id,
+        accountId: item.accountId,
+        userId: item.userId,
         status: item.status
       };
 

@@ -8,7 +8,7 @@
     "shared/*"
   ],
   "scripts": {
-    "build": "turbo run build",
+    "build": "turbo run build && sam build",
     "dev": "turbo run dev --concurrency=15",
     "dev:shared": "turbo run dev --filter=\"./shared/**\" --concurrency=10",
     "lint": "turbo run lint",

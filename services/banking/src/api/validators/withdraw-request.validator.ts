@@ -14,7 +14,7 @@ export const validateWithdrawRequest = (event: APIGatewayProxyEvent): void => {
   }
 
   // Parse and validate request body
-  const body = event.body ? JSON.parse(event.body) : {};
+  const body = (event.body || {}) as any;
 
   if (!body.accountId) {
     throw new ValidationError('Account ID is required');

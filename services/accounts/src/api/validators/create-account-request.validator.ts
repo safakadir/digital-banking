@@ -13,8 +13,8 @@ export const validateCreateAccountRequest = (event: APIGatewayProxyEvent): void 
     throw new ValidationError('User ID is required');
   }
 
-  // Parse and validate request body
-  const body = event.body ? JSON.parse(event.body) : {};
+  // Get parsed request body (already parsed by httpJsonBodyParser middleware)
+  const body = (event.body || {}) as any;
 
   if (!body.name) {
     throw new ValidationError('Account name is required');
