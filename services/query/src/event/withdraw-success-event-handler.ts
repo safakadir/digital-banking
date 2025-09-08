@@ -31,11 +31,11 @@ export class WithdrawSuccessEventHandler {
 
     const transactionTableName = 
       process.env.TRANSACTION_TABLE_NAME || 
-      `QuerySvc-TransactionTable-${process.env.ENV || 'dev'}`;
+      `QuerySvc-TransactionsTable-${process.env.ENV || 'dev'}`;
     
     const balanceTableName = 
       process.env.BALANCE_TABLE_NAME || 
-      `QuerySvc-BalanceTable-${process.env.ENV || 'dev'}`;
+      `QuerySvc-BalancesTable-${process.env.ENV || 'dev'}`;
 
     const inboxItem: InboxItem = {
       messageId: event.id,

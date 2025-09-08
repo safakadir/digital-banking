@@ -53,9 +53,9 @@ export class CloseAccountEventHandler {
           {
             Update: {
               TableName: accountsProjectionTableName,
-              Key: { id: event.accountId },
+              Key: { accountId: event.accountId },
               UpdateExpression: 'SET #status = :status',
-              ConditionExpression: 'attribute_exists(id)',
+              ConditionExpression: 'attribute_exists(accountId)',
               ExpressionAttributeNames: {
                 '#status': 'status'
               },
@@ -63,8 +63,7 @@ export class CloseAccountEventHandler {
                 ':status': AccountStatus.CLOSED
               }
             }
-          },
-
+          }
         ]
       });
 

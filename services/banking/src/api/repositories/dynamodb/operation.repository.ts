@@ -35,7 +35,7 @@ export class OperationRepository implements IOperationRepository {
     try {
       const command = new GetCommand({
         TableName: this.tableName,
-        Key: { operationId }
+        Key: { id: operationId }
       });
 
       const result = await this.dynamoClient.send(command);

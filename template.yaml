@@ -73,13 +73,13 @@ Resources:
   LedgerSvcCommandFnInboxTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "LedgerSvc-CommandFn-Inbox-${Env}"
+      TableName: !Sub "LedgerSvc-InboxTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: messageId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: messageId
           KeyType: HASH
       TimeToLiveSpecification:
         AttributeName: expiration
@@ -103,13 +103,13 @@ Resources:
   QuerySvcEventFnInboxTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "QuerySvc-EventFn-Inbox-${Env}"
+      TableName: !Sub "QuerySvc-InboxTable-${Env}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: messageId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: messageId
           KeyType: HASH
       TimeToLiveSpecification:
         AttributeName: expiration
@@ -589,6 +589,13 @@ Resources:
       Environment:
         Variables:
           INBOX_TABLE: !Ref QuerySvcEventFnInboxTable
+          INBOX_TABLE_NAME: !Ref QuerySvcEventFnInboxTable
+          TRANSACTIONS_TABLE_NAME: !Ref QuerySvcTransactionsTable
+          TRANSACTION_TABLE_NAME: !Ref QuerySvcTransactionsTable
+          BALANCES_TABLE_NAME: !Ref QuerySvcBalancesTable
+          BALANCE_TABLE_NAME: !Ref QuerySvcBalancesTable
+          ACCOUNTS_PROJECTION_TABLE_NAME: !Ref QuerySvcAccountsProjectionTable
+          ACCOUNT_PROJECTION_TABLE_NAME: !Ref QuerySvcAccountsProjectionTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref QuerySvcTransactionsTable

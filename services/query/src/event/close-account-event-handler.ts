@@ -30,7 +30,7 @@ export class CloseAccountEventHandler {
 
     const accountProjectionTableName = 
       process.env.ACCOUNT_PROJECTION_TABLE_NAME || 
-      `QuerySvc-AccountProjectionTable-${process.env.ENV || 'dev'}`;
+      `QuerySvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
 
     const inboxItem: InboxItem = {
       messageId: event.id,
