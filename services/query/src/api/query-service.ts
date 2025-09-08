@@ -1,18 +1,12 @@
 import { Logger } from '@aws-lambda-powertools/logger';
-import {
-  DepositEvent,
-  WithdrawSuccessEvent,
-  WithdrawFailedEvent,
-  CreateAccountEvent,
-  CloseAccountEvent
-} from '@digital-banking/events';
 import { Transaction, Balance, BalanceWithAccountInfo } from '@digital-banking/models';
 import { 
   IBalanceRepository,
   ITransactionRepository,
   IAccountProjectionRepository
- } from '../repositories/interfaces';
-import { AccountProjection } from '../models';
+ } from './repositories/interfaces';
+import { AccountProjection } from './models';
+import { NotFoundError } from '@digital-banking/errors';
 
 // Powertools
 const logger = new Logger();
@@ -61,7 +55,7 @@ export class QueryService {
 
       if (!balance) {
         logger.warn('Balance not found for account', { accountId });
-        throw new Error(`Balance not found for account ${accountId}`);
+        throw new NotFoundError(`Balance not found for account ${accountId}`);
       }
 
       logger.info('Balance retrieved successfully', { accountId, balance: balance.balance });

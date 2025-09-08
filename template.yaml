@@ -273,13 +273,13 @@ Resources:
   BankingSvcOperationsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "BankingSvc-OperationsTable-${Env}"
+      TableName: !Sub "BankingSvc-OperationsTable-${Env}-v2"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: operationId
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: operationId
           KeyType: HASH
           
   BankingSvcAccountsProjectionTable:

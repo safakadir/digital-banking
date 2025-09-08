@@ -52,7 +52,7 @@ export class WithdrawSuccessEventHandler {
           {
             Update: {
               TableName: operationsTableName,
-              Key: { id: event.operationId },
+              Key: { operationId: event.operationId },
               UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
               ConditionExpression: '#status = :pendingStatus',
               ExpressionAttributeNames: {

@@ -1,7 +1,7 @@
 import { commonApiMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
 import { GetBalancesResponse } from '../dto';
-import { QueryService } from '../services';
+import { QueryService } from '../query-service';
 
 export const getBalancesHandler = (queryService: QueryService, telemetry: TelemetryBundle) =>
   commonApiMiddleware(async (event) => {

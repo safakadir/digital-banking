@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DepositCommand, WithdrawCommand } from '@digital-banking/commands';
 import { Operation } from '@digital-banking/models';
 import { IOperationRepository, IAccountsProjectionRepository } from './repositories/interfaces';
+import { NotFoundError, ValidationError } from '@digital-banking/errors';
 
 // Powertools
 const logger = new Logger();
@@ -29,7 +30,7 @@ export class BankingService {
       const isValid = await this.accountsProjectionRepository.validateOwnership(accountId, userId);
 
       if (!isValid) {
-        throw new Error('Account not found, not owned by user, or not active');
+        throw new ValidationError('Account not found, not owned by user, or not active');
       }
 
       logger.info('Account ownership validated successfully', { accountId, userId });
@@ -177,7 +178,7 @@ export class BankingService {
       const operation = await this.operationRepository.getById(operationId);
 
       if (!operation) {
-        throw new Error('Operation not found');
+        throw new NotFoundError('Operation not found');
       }
 
       // 2. Return operation

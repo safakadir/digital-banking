@@ -3,7 +3,7 @@ import {
   BalanceRepository,
   TransactionRepository,
   AccountProjectionRepository
-} from '../repositories/dynamodb';
+} from './repositories/dynamodb';
 
 /**
  * Creates a QueryService instance with dependency injection
@@ -21,6 +21,3 @@ export function createQueryService(): QueryService {
     accountProjectionRepository
   );
 }
-
-// Export service classes for direct usage if needed
-export { QueryService };
