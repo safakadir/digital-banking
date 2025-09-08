@@ -57,11 +57,10 @@ Live at: https://mfwz73pfc3.execute-api.eu-central-1.amazonaws.com/dev
 ### Get Authenticated
 
 ```bash
-aws cognito-idp admin-set-user-password \
-  --user-pool-id eu-central-1_THiAwfqNO \
-  --username test@mail.com \
-  --password Aa123456 \
-  --permanent
+aws cognito-idp initiate-auth \
+  --client-id 6be0cg2ppovecf7bu6ed5nttbc \
+  --auth-flow USER_PASSWORD_AUTH \
+  --auth-parameters USERNAME=test@mail.com,PASSWORD=Aa123456
 ```
 
 Get `IdToken` from the response and use it as *Bearer Token* in `Authorization` header of API requests.
@@ -100,47 +99,31 @@ This project follows an event-driven microservices architecture with the followi
 
 ### Messages
 
-**Accounts Service**:
-Commands Received: N/A
-Commands Sent: N/A
-Events Emitted: `CREATE_ACCOUNT_EVENT`, `CLOSE_ACCOUNT_EVENT`
-Events Received: N/A
-
-**Banking Service**:
-Commands Received: N/A
-Commands Sent: `DEPOSIT_CMD`, `WITHDRAW_CMD`
-Events Emitted: N/A
-Events Received: `DEPOSIT_EVENT`, `WITHDRAW_SUCCESS_EVENT`, `WITHDRAW_FAILED_EVENT`, `CREATE_ACCOUNT_EVENT`, `CLOSE_ACCOUNT_EVENT`
-
-**Ledger Service**:
-Commands Received: `DEPOSIT_CMD`, `WITHDRAW_CMD`
-Commands Sent: N/A
-Events Emitted: `DEPOSIT_EVENT`, `WITHDRAW_SUCCESS_EVENT`, `WITHDRAW_FAILED_EVENT`
-Events Received: N/A
-
-**Query Service**:
-Commands Received: N/A
-Commands Sent: N/A
-Events Emitted: N/A
-Events Received: `DEPOSIT_EVENT`, `WITHDRAW_SUCCESS_EVENT`, `WITHDRAW_FAILED_EVENT`, `CREATE_ACCOUNT_EVENT`, `CLOSE_ACCOUNT_EVENT`
+| Service | Commands Received | Commands Sent | Events Emitted | Events Received |
+|---------|------------------|---------------|----------------|-----------------|
+| **Accounts Service** | N/A | N/A | `CREATE_ACCOUNT_EVENT`<br>`CLOSE_ACCOUNT_EVENT` | N/A |
+| **Banking Service** | N/A | `DEPOSIT_CMD`<br>`WITHDRAW_CMD` | N/A | `DEPOSIT_EVENT`<br>`WITHDRAW_SUCCESS_EVENT`<br>`WITHDRAW_FAILED_EVENT`<br>`CREATE_ACCOUNT_EVENT`<br>`CLOSE_ACCOUNT_EVENT` |
+| **Ledger Service** | `DEPOSIT_CMD`<br>`WITHDRAW_CMD` | N/A | `DEPOSIT_EVENT`<br>`WITHDRAW_SUCCESS_EVENT`<br>`WITHDRAW_FAILED_EVENT` | N/A |
+| **Query Service** | N/A | N/A | N/A | `DEPOSIT_EVENT`<br>`WITHDRAW_SUCCESS_EVENT`<br>`CREATE_ACCOUNT_EVENT`<br>`CLOSE_ACCOUNT_EVENT` |
 
 ### Architectural Notes 
 
-- Message(Event/Command) handling and API request handling are separated.
-- Outbox pattern used to not loose messages.
-  - Method: Outbox Table -> DynamoDB Streams -> EventBridge Pipes -> optionally SNS(if fan out needed) -> SQS -> Target Lambda Functions (Event or Command Handler)
-  - EventBridge Pipes was the only way to wire up DynamoDB Streams to SQS and SNS.
-  - Domain operations and writing to outbox is atomic (single transaction).
-- Inbox pattern used to handle idempotency.
-  - Method: SQS Queue -> Lambda Functions (Event or Command Handler) --> Transaction Start -> Inbox Table Insert wiht Idempotency Check -> Domain Operations -> Transaction Commit
-  - Domain operations and inbox management is atomic (single transaction).
-- CQRS: Commands and Queries are separated 
-- Event Sourcing: Append-only transactions
-- Transaction Isolation: Serializable
-- `/lambdas` folders are entry layer for all services. Then lambda events (api or event/command) are routed to their respective handlers.
-  - `/api` folder is n-tier architecture for handling API requests.
-  - `/event` or `/command` folder is message handling layer. Then message handlers are responsible for domain operations and writing to outbox.
-  - Because of the nature and transaction capability limitations of *DynamoDB*, a database driven architecture is used in event/command handlers.
+- Message(Event/Command) handling and API request handling are **separated**.
+- **Outbox pattern** used to not loose messages.
+  - **Method:** Outbox Table -> DynamoDB Streams -> EventBridge Pipes -> optionally SNS(if fan out needed) -> SQS -> Target Lambda Functions (Event or Command Handler)
+  - EventBridge Pipes was the only way to **wire up DynamoDB Streams to SQS and SNS**.
+  - Domain operations and writing to outbox is **atomic** (single transaction).
+- **Inbox pattern** used to handle idempotency.
+  - **Method:** SQS Queue -> Lambda Functions (Event or Command Handler) --> Transaction Start -> Inbox Table Insert wiht Idempotency Check -> Domain Operations -> Transaction Commit
+  - Domain operations and inbox management is **atomic** (single transaction).
+- **Projection Tables:** Used to store a synced copy of other services data to avoid cross-service calls and dependencies.
+- **CQRS:** Commands and Queries are separated 
+- **Event Sourcing:** Append-only transactions
+- **Transaction Isolation:** Serializable
+- `/lambdas` folders are **entry layer** for all services. Then lambda events (api or event/command) are routed to their respective handlers.
+  - `/api` folder is **n-tier architecture** for handling **API requests**.
+  - `/event` or `/command` folder is **event/command handling** layer. Then message handlers are responsible for domain operations and writing to outbox.
+  - Because of the nature and limitations of **DynamoDB transactions**, a **database driven architecture** is used in event/command handlers out of necessity.
 
 
 ## Technologies Used
