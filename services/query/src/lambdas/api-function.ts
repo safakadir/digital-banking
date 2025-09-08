@@ -1,8 +1,8 @@
 import httpRouter from '@middy/http-router';
-import { createQueryService } from '../services';
-import { getTransactionsHandler } from './api-handlers/get-transactions-handler';
-import { getBalanceHandler } from './api-handlers/get-balance-handler';
-import { getBalancesHandler } from './api-handlers/get-balances-handler';
+import { createQueryService } from '../api/services';
+import { getTransactionsHandler } from '../api/handler/get-transactions-handler';
+import { getBalanceHandler } from '../api/handler/get-balance-handler';
+import { getBalancesHandler } from '../api/handler/get-balances-handler';
 import { createDefaultTelemetryBundle } from '@digital-banking/utils';
 
 /**

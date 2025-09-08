@@ -1,7 +1,7 @@
 import { commonApiMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
-import { GetBalancesResponse } from '../../dto';
-import { QueryService } from '../../services';
+import { GetBalancesResponse } from '../dto';
+import { QueryService } from '../services';
 
 export const getBalancesHandler = (queryService: QueryService, telemetry: TelemetryBundle) =>
   commonApiMiddleware(async (event) => {
@@ -11,15 +11,11 @@ export const getBalancesHandler = (queryService: QueryService, telemetry: Teleme
       const userId = event.requestContext.authorizer?.claims?.sub || 'unknown';
       logger.info('Getting all balances', { userId });
 
-      // Call service layer
-      const result = await queryService.getBalances(userId);
+      // Call service layer - getBalances now returns BalanceWithAccountInfo[]
+      const balancesWithAccountInfo = await queryService.getBalances(userId);
 
-      // Build response DTO
-      const response: GetBalancesResponse = result.balances.map((balance: any) => ({
-        ...balance,
-        currency: 'TRY', // Default currency - TODO: Get from account details
-        accountName: `Account ${balance.accountId}` // TODO: Get from account details
-      }));
+      // Build response DTO - the service already returns the correct format
+      const response: GetBalancesResponse = balancesWithAccountInfo;
 
       // Return success response
       return {

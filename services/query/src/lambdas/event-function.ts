@@ -1,48 +1,23 @@
 import { SQSEvent } from 'aws-lambda';
-import { createQueryService } from '../services';
 import { createDefaultTelemetryBundle } from '@digital-banking/utils';
 import { BankingEvent } from '@digital-banking/events';
-import { depositEventHandler } from './event-handlers/deposit-event-handler';
-import { withdrawSuccessEventHandler } from './event-handlers/withdraw-success-event-handler';
-import { withdrawFailedEventHandler } from './event-handlers/withdraw-failed-event-handler';
-import { createAccountEventHandler } from './event-handlers/create-account-event-handler';
-import { closeAccountEventHandler } from './event-handlers/close-account-event-handler';
+import { DepositEventHandler } from '../event/deposit-event-handler';
+import { WithdrawSuccessEventHandler } from '../event/withdraw-success-event-handler';
+import { WithdrawFailedEventHandler } from '../event/withdraw-failed-event-handler';
+import { CreateAccountEventHandler } from '../event/create-account-event-handler';
+import { CloseAccountEventHandler } from '../event/close-account-event-handler';
 import { commonEventMiddleware } from '@digital-banking/middleware';
-import { IdempotencyConfig, makeIdempotent } from '@aws-lambda-powertools/idempotency';
-import { DynamoDBPersistenceLayer } from '@aws-lambda-powertools/idempotency/dynamodb';
-
-// Configure idempotency
-const persistenceStore = new DynamoDBPersistenceLayer({
-  tableName: process.env.IDEMPOTENCY_TABLE || 'QuerySvc-EventFn-Idempotency-dev'
-});
-
-const idempotencyConfig = new IdempotencyConfig({
-  // Use message ID as the idempotency key (extracting from various message formats)
-  eventKeyJmesPath: `
-    Records[*].body | 
-    fromjson(@).Type == 'Notification' ? 
-      (fromjson(fromjson(@).Message).id ? 
-        fromjson(fromjson(@).Message).id : 
-        fromjson(fromjson(@).Message).eventData.id) : 
-      fromjson(@).id
-  `,
-  // TTL for idempotency records (24 hours)
-  expiresAfterSeconds: 86400
-});
 
 /**
  * Creates an event handler with dependency injection support
- * @param queryService - QueryService instance
- * @param logger - Logger instance
- * @param tracer - Tracer instance
- * @param metrics - Metrics instance
+ * @param telemetry - Telemetry bundle with logger, tracer and metrics
  * @returns Event handler function
  */
 export function createEventFunctionHandler(
-  queryService = createQueryService(),
   telemetry = createDefaultTelemetryBundle()
 ) {
   const { logger } = telemetry;
+
   /**
    * Processes events for the Query service
    * Returns batchItemFailures for failed records to enable partial batch processing
@@ -92,19 +67,19 @@ export function createEventFunctionHandler(
 
         switch (message.type) {
           case 'DEPOSIT_EVENT':
-            await depositEventHandler(queryService, telemetry)(message);
+            await new DepositEventHandler(telemetry).handle(message);
             break;
           case 'WITHDRAW_SUCCESS_EVENT':
-            await withdrawSuccessEventHandler(queryService, telemetry)(message);
+            await new WithdrawSuccessEventHandler(telemetry).handle(message);
             break;
           case 'WITHDRAW_FAILED_EVENT':
-            await withdrawFailedEventHandler(queryService, telemetry)(message);
+            await new WithdrawFailedEventHandler(telemetry).handle(message);
             break;
           case 'CREATE_ACCOUNT_EVENT':
-            await createAccountEventHandler(queryService, telemetry)(message);
+            await new CreateAccountEventHandler(telemetry).handle(message);
             break;
           case 'CLOSE_ACCOUNT_EVENT':
-            await closeAccountEventHandler(queryService, telemetry)(message);
+            await new CloseAccountEventHandler(telemetry).handle(message);
             break;
           default: {
             // Exhaustive check to ensure all event types are handled
@@ -121,14 +96,8 @@ export function createEventFunctionHandler(
     return { batchItemFailures };
   };
 
-  // Make the handler idempotent
-  const idempotentHandler = makeIdempotent(eventHandler, {
-    persistenceStore,
-    config: idempotencyConfig
-  });
-
   // Return the handler with middleware
-  return commonEventMiddleware(idempotentHandler, telemetry);
+  return commonEventMiddleware(eventHandler, telemetry);
 }
 
 // Export the default handler instance

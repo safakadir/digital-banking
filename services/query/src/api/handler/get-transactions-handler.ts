@@ -1,9 +1,9 @@
 import { commonApiMiddleware } from '@digital-banking/middleware';
 import { TelemetryBundle } from '@digital-banking/utils';
-import { GetBalanceResponse } from '../../dto';
-import { QueryService } from '../../services';
+import { GetTransactionsResponse } from '../dto';
+import { QueryService } from '../services';
 
-export const getBalanceHandler = (queryService: QueryService, telemetry: TelemetryBundle) =>
+export const getTransactionsHandler = (queryService: QueryService, telemetry: TelemetryBundle) =>
   commonApiMiddleware(async (event) => {
     const { logger } = telemetry;
     try {
@@ -15,18 +15,13 @@ export const getBalanceHandler = (queryService: QueryService, telemetry: Telemet
         };
       }
 
-      logger.info('Getting balance', { accountId });
+      logger.info('Getting transactions', { accountId });
 
       // Call service layer
-      const result = await queryService.getBalance(accountId);
+      const result = await queryService.getTransactions(accountId);
 
-      // Build response DTO
-      const response: GetBalanceResponse = {
-        accountId: result.accountId,
-        balance: result.balance,
-        currency: 'TRY', // TODO: Get from account details
-        lastUpdated: result.lastUpdated
-      };
+      // Build response DTO - service already returns transactions in correct format
+      const response: GetTransactionsResponse = result;
 
       // Return success response
       return {
@@ -34,7 +29,7 @@ export const getBalanceHandler = (queryService: QueryService, telemetry: Telemet
         body: JSON.stringify(response)
       };
     } catch (error) {
-      logger.error('Error getting balance', { error });
+      logger.error('Error getting transactions', { error });
       return {
         statusCode: 500,
         body: JSON.stringify({ message: 'Internal Server Error' })
