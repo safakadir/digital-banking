@@ -2,17 +2,14 @@ import { TelemetryBundle } from '@digital-banking/utils';
 import { CloseAccountEvent } from '@digital-banking/events';
 import { AccountStatus, InboxItem } from '@digital-banking/models';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { QueryServiceConfig } from '@digital-banking/config';
 
 export class CloseAccountEventHandler {
-  private dynamoClient: DynamoDBDocumentClient
-  private inboxTableName: string;
-
-  constructor(private readonly telemetry: TelemetryBundle) {
-    this.dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient());
-    this.inboxTableName = 
-      process.env.QUERY_INBOX_TABLE_NAME || `QuerySvc-InboxTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly telemetry: TelemetryBundle,
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly config: QueryServiceConfig
+  ) {}
 
   /**
    * Process a close account event with transaction-based inbox pattern
@@ -27,9 +24,6 @@ export class CloseAccountEventHandler {
 
     const now = new Date().toISOString();
 
-    const accountProjectionTableName = 
-      process.env.ACCOUNTS_PROJECTION_TABLE_NAME || 
-      `QuerySvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
 
     const inboxItem: InboxItem = {
       messageId: event.id,
@@ -42,7 +36,7 @@ export class CloseAccountEventHandler {
           // a) Inbox insert (IN_PROGRESS)
           {
             Put: {
-              TableName: this.inboxTableName,
+              TableName: this.config.inboxTableName,
               Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
@@ -50,7 +44,7 @@ export class CloseAccountEventHandler {
           // b) Domain state update - Update account status to CLOSED
           {
             Update: {
-              TableName: accountProjectionTableName,
+              TableName: this.config.accountProjectionTableName,
               Key: { accountId: event.accountId },
               UpdateExpression: 'SET #status = :status',
               ConditionExpression: 'attribute_exists(accountId)',

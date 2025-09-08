@@ -7,35 +7,17 @@ import {
   GetCommand,
   UpdateCommand
 } from '@aws-sdk/lib-dynamodb';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 import { JournalEntry } from '../models/journal-entry';
 import { InboxItem, OutboxItem } from '@digital-banking/models';
+import { LedgerServiceConfig } from '@digital-banking/config';
 
 export class DepositCommandHandler {
-  private dynamoClient: DynamoDBDocumentClient;
-  private inboxTableName: string;
-  private ledgerTableName: string;
-  private balanceTableName: string;
-  private outboxTableName: string;
-
-  constructor(private readonly telemetry: TelemetryBundle) {
-    // Initialize DynamoDB client for transactions
-    const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-    this.dynamoClient = DynamoDBDocumentClient.from(client, {
-      marshallOptions: {
-        removeUndefinedValues: true
-      }
-    });
-    this.inboxTableName =
-      process.env.LEDGER_INBOX_TABLE_NAME || `LedgerSvc-InboxTable-${process.env.ENV || 'dev'}`;
-    this.ledgerTableName =
-      process.env.LEDGER_TABLE_NAME || `LedgerSvc-LedgerTable-${process.env.ENV || 'dev'}`;
-    this.balanceTableName =
-      process.env.BALANCE_TABLE_NAME || `LedgerSvc-BalanceTable-${process.env.ENV || 'dev'}`;
-    this.outboxTableName =
-      process.env.OUTBOX_TABLE_NAME || `LedgerSvc-OutboxTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly telemetry: TelemetryBundle,
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly config: LedgerServiceConfig
+  ) {}
 
   /**
    * Process a deposit command with event sourcing and double-entry bookkeeping
@@ -116,7 +98,7 @@ export class DepositCommandHandler {
           // a) Inbox insert (IN_PROGRESS)
           {
             Put: {
-              TableName: this.inboxTableName,
+              TableName: this.config.inboxTableName,
               Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
@@ -124,21 +106,21 @@ export class DepositCommandHandler {
           // b) Journal Entry - Debit (External Cash)
           {
             Put: {
-              TableName: this.ledgerTableName,
+              TableName: this.config.ledgerTableName,
               Item: journalEntryDebit
             }
           },
           // c) Journal Entry - Credit (Customer Account)
           {
             Put: {
-              TableName: this.ledgerTableName,
+              TableName: this.config.ledgerTableName,
               Item: journalEntryCredit
             }
           },
           // d) Atomic Balance Increment
           {
             Update: {
-              TableName: this.balanceTableName,
+              TableName: this.config.balanceTableName,
               Key: { accountId: command.accountId },
               UpdateExpression: 'ADD balance :amount SET updatedAt = :now',
               ExpressionAttributeValues: {
@@ -152,7 +134,7 @@ export class DepositCommandHandler {
           // e) Outbox event for publishing (updated with new balance after calculation)
           {
             Put: {
-              TableName: this.outboxTableName,
+              TableName: this.config.outboxTableName,
               Item: outboxItem
             }
           }
@@ -164,7 +146,7 @@ export class DepositCommandHandler {
       // Get the updated balance to include in the event (eventual consistency is fine here)
       const balanceResult = await this.dynamoClient.send(
         new GetCommand({
-          TableName: this.balanceTableName,
+          TableName: this.config.balanceTableName,
           Key: { accountId: command.accountId }
         })
       );
@@ -178,7 +160,7 @@ export class DepositCommandHandler {
 
       await this.dynamoClient.send(
         new UpdateCommand({
-          TableName: this.outboxTableName,
+          TableName: this.config.outboxTableName,
           Key: { id: depositEventId },
           UpdateExpression: 'SET eventData = :eventData',
           ExpressionAttributeValues: {

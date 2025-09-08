@@ -18,6 +18,7 @@
     "@aws-sdk/client-sns": "^3.883.0",
     "@aws-sdk/client-sqs": "^3.523.0",
     "@aws-sdk/lib-dynamodb": "^3.523.0",
+    "@digital-banking/config": "file:../../shared/config",
     "@digital-banking/constants": "file:../../shared/constants",
     "@digital-banking/events": "file:../../shared/events",
     "@digital-banking/middleware": "file:../../shared/middleware",

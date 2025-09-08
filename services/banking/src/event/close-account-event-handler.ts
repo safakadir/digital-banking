@@ -2,19 +2,14 @@ import { TelemetryBundle } from '@digital-banking/utils';
 import { CloseAccountEvent } from '@digital-banking/events';
 import { AccountStatus, InboxItem } from '@digital-banking/models';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { BankingServiceConfig } from '@digital-banking/config';
 
 export class CloseAccountEventHandler {
-  private dynamoClient: DynamoDBDocumentClient;
-  private inboxTableName: string;
-
-  constructor(private readonly telemetry: TelemetryBundle) {
-    // Initialize DynamoDB client for transactions
-    const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
-    this.inboxTableName =
-      process.env.BANKING_INBOX_TABLE_NAME || `BankingSvc-InboxTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly telemetry: TelemetryBundle,
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly config: BankingServiceConfig
+  ) {}
 
   /**
    * Process a close account event with transaction-based inbox pattern
@@ -43,7 +38,7 @@ export class CloseAccountEventHandler {
           // a) Inbox insert (IN_PROGRESS)
           {
             Put: {
-              TableName: this.inboxTableName,
+              TableName: this.config.inboxTableName,
               Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }

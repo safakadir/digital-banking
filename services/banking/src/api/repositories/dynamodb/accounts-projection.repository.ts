@@ -1,4 +1,3 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { AccountStatus } from '@digital-banking/models';
@@ -8,20 +7,10 @@ import { AccountProjection } from '../../models/account-projection';
 const logger = new Logger();
 
 export class AccountsProjectionRepository implements IAccountsProjectionRepository {
-  private dynamoClient: DynamoDBDocumentClient;
-  private tableName: string;
-
-  constructor(region = process.env.AWS_REGION || 'us-east-1') {
-    const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client, {
-      marshallOptions: {
-        removeUndefinedValues: true
-      }
-    });
-    this.tableName =
-      process.env.ACCOUNTS_PROJECTION_TABLE_NAME ||
-      `BankingSvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly tableName: string
+  ) {}
 
   /**
    * Get account projection by ID for ownership validation

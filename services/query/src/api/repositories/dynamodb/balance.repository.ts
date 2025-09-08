@@ -1,4 +1,3 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -16,19 +15,11 @@ const logger = new Logger();
  * DynamoDB implementation of balance repository
  */
 export class BalanceRepository implements IBalanceRepository {
-  private dynamoClient: DynamoDBDocumentClient;
-  private tableName: string;
+  constructor(
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly tableName: string
+  ) {}
 
-  constructor(region = process.env.AWS_REGION || 'us-east-1') {
-    const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client, {
-      marshallOptions: {
-        removeUndefinedValues: true
-      }
-    });
-    this.tableName =
-      process.env.BALANCES_TABLE_NAME || `QuerySvc-BalancesTable-${process.env.ENV || 'dev'}`;
-  }
 
   /**
    * Get balance for a specific account

@@ -1,16 +1,30 @@
 import { SQSEvent } from 'aws-lambda';
 import { commonEventMiddleware } from '@digital-banking/middleware';
-import { createDefaultTelemetryBundle, transformEventData } from '@digital-banking/utils';
+import { createDefaultTelemetryBundle, transformEventData, createOrUseDynamoDbClient } from '@digital-banking/utils';
 import { DepositCommandHandler, WithdrawCommandHandler } from '../command';
 import { BankingCommand } from '@digital-banking/commands';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { LedgerServiceConfig } from '@digital-banking/config';
 
 /**
  * Creates a command handler with dependency injection support
  * @param telemetry - TelemetryBundle instance
+ * @param dynamoClient - DynamoDB document client (optional, will create default if not provided)
+ * @param config - Service configuration (optional, will use env vars if not provided)
  * @returns Command handler function
  */
-export function createCommandFunctionHandler(telemetry = createDefaultTelemetryBundle()) {
+export function createCommandFunctionHandler(
+  telemetry = createDefaultTelemetryBundle(),
+  dynamoClient?: DynamoDBDocumentClient,
+  config?: LedgerServiceConfig
+) {
   const { logger } = telemetry;
+  
+  // Create default DynamoDB client if not provided
+  const dbClient = createOrUseDynamoDbClient(dynamoClient);
+  
+  // Use provided config or create default from environment
+  const serviceConfig = config || LedgerServiceConfig.fromEnvironment();
   /**
    * Processes deposit and withdraw commands from SQS
    * Returns batchItemFailures for failed records to enable partial batch processing
@@ -38,10 +52,18 @@ export function createCommandFunctionHandler(telemetry = createDefaultTelemetryB
 
         switch (message.type) {
           case 'DEPOSIT_CMD':
-            await new DepositCommandHandler(telemetry).handle(message);
+            await new DepositCommandHandler(
+              telemetry,
+              dbClient,
+              serviceConfig
+            ).handle(message);
             break;
           case 'WITHDRAW_CMD':
-            await new WithdrawCommandHandler(telemetry).handle(message);
+            await new WithdrawCommandHandler(
+              telemetry,
+              dbClient,
+              serviceConfig
+            ).handle(message);
             break;
           default: {
             // Exhaustive check to ensure all command types are handled

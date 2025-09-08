@@ -1,6 +1,6 @@
 import { SQSEvent } from 'aws-lambda';
 import { commonEventMiddleware } from '@digital-banking/middleware';
-import { createDefaultTelemetryBundle, transformEventData } from '@digital-banking/utils';
+import { createDefaultTelemetryBundle, transformEventData, createOrUseDynamoDbClient } from '@digital-banking/utils';
 import {
   BankingEvent,
   CloseAccountEvent,
@@ -16,14 +16,28 @@ import {
   CreateAccountEventHandler,
   CloseAccountEventHandler
 } from '../event';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { BankingServiceConfig } from '@digital-banking/config';
 
 /**
  * Creates an event handler with dependency injection support
  * @param telemetry - TelemetryBundle instance
+ * @param dynamoClient - DynamoDB document client (optional, will create default if not provided)
+ * @param config - Service configuration (optional, will use env vars if not provided)
  * @returns Event handler function
  */
-export function createEventFunctionHandler(telemetry = createDefaultTelemetryBundle()) {
+export function createEventFunctionHandler(
+  telemetry = createDefaultTelemetryBundle(),
+  dynamoClient?: DynamoDBDocumentClient,
+  config?: BankingServiceConfig
+) {
   const { logger } = telemetry;
+  
+  // Create default DynamoDB client if not provided
+  const dbClient = createOrUseDynamoDbClient(dynamoClient);
+  
+  // Use provided config or create default from environment
+  const serviceConfig = config || BankingServiceConfig.fromEnvironment();
   /**
    * Processes events for the Banking service
    * Returns batchItemFailures for failed records to enable partial batch processing
@@ -51,21 +65,39 @@ export function createEventFunctionHandler(telemetry = createDefaultTelemetryBun
 
         switch (message.type) {
           case 'DEPOSIT_EVENT':
-            await new DepositEventHandler(telemetry).handle(message as DepositEvent);
+            await new DepositEventHandler(
+              telemetry,
+              dbClient,
+              serviceConfig
+            ).handle(message as DepositEvent);
             break;
           case 'WITHDRAW_SUCCESS_EVENT':
-            await new WithdrawSuccessEventHandler(telemetry).handle(
-              message as WithdrawSuccessEvent
-            );
+            await new WithdrawSuccessEventHandler(
+              telemetry,
+              dbClient,
+              serviceConfig
+            ).handle(message as WithdrawSuccessEvent);
             break;
           case 'WITHDRAW_FAILED_EVENT':
-            await new WithdrawFailedEventHandler(telemetry).handle(message as WithdrawFailedEvent);
+            await new WithdrawFailedEventHandler(
+              telemetry,
+              dbClient,
+              serviceConfig
+            ).handle(message as WithdrawFailedEvent);
             break;
           case 'CREATE_ACCOUNT_EVENT':
-            await new CreateAccountEventHandler(telemetry).handle(message as CreateAccountEvent);
+            await new CreateAccountEventHandler(
+              telemetry,
+              dbClient,
+              serviceConfig
+            ).handle(message as CreateAccountEvent);
             break;
           case 'CLOSE_ACCOUNT_EVENT':
-            await new CloseAccountEventHandler(telemetry).handle(message as CloseAccountEvent);
+            await new CloseAccountEventHandler(
+              telemetry,
+              dbClient,
+              serviceConfig
+            ).handle(message as CloseAccountEvent);
             break;
           default: {
             // Exhaustive check to ensure all event types are handled

@@ -1,4 +1,3 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Operation, OutboxItem } from '@digital-banking/models';
@@ -11,22 +10,11 @@ const logger = new Logger();
  * DynamoDB implementation of operation repository
  */
 export class OperationRepository implements IOperationRepository {
-  private dynamoClient: DynamoDBDocumentClient;
-  private tableName: string;
-  private outboxTableName: string;
-
-  constructor(region = process.env.AWS_REGION || 'us-east-1') {
-    const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client, {
-      marshallOptions: {
-        removeUndefinedValues: true
-      }
-    });
-    this.tableName =
-      process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
-    this.outboxTableName =
-      process.env.BANKING_OUTBOX_TABLE_NAME || `BankingSvc-OutboxTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly tableName: string,
+    private readonly outboxTableName: string
+  ) {}
 
   /**
    * Get operation by ID

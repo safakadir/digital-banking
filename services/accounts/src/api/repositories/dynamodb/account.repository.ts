@@ -1,4 +1,3 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -16,22 +15,11 @@ const logger = new Logger();
  * DynamoDB implementation of account repository
  */
 export class AccountRepository implements IAccountRepository {
-  private dynamoClient: DynamoDBDocumentClient;
-  private tableName: string;
-  private outboxTableName: string;
-
-  constructor(region = process.env.AWS_REGION || 'us-east-1') {
-    const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client, {
-      marshallOptions: {
-        removeUndefinedValues: true
-      }
-    });
-    this.tableName =
-      process.env.ACCOUNTS_TABLE_NAME || `AccountsSvc-AccountsTable-${process.env.ENV || 'dev'}`;
-    this.outboxTableName =
-      process.env.ACCOUNTS_OUTBOX_TABLE_NAME || `AccountsSvc-OutboxTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly tableName: string,
+    private readonly outboxTableName: string
+  ) {}
 
   /**
    * Get account by ID

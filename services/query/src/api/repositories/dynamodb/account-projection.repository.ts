@@ -1,4 +1,3 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -14,19 +13,10 @@ const logger = new Logger();
  * DynamoDB implementation of account projection repository
  */
 export class AccountProjectionRepository implements IAccountProjectionRepository {
-  private dynamoClient: DynamoDBDocumentClient;
-  private tableName: string;
-
-  constructor(region = process.env.AWS_REGION || 'us-east-1') {
-    const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client, {
-      marshallOptions: {
-        removeUndefinedValues: true
-      }
-    });
-    this.tableName =
-      process.env.ACCOUNTS_PROJECTION_TABLE_NAME || `QuerySvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly tableName: string
+  ) {}
 
   /**
    * Get account projection by ID

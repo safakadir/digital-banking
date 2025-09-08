@@ -1,20 +1,15 @@
 import { TelemetryBundle } from '@digital-banking/utils';
 import { WithdrawSuccessEvent } from '@digital-banking/events';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { InboxItem } from '@digital-banking/models';
+import { BankingServiceConfig } from '@digital-banking/config';
 
 export class WithdrawSuccessEventHandler {
-  private dynamoClient: DynamoDBDocumentClient;
-  private inboxTableName: string;
-
-  constructor(private readonly telemetry: TelemetryBundle) {
-    // Initialize DynamoDB client for transactions
-    const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-    this.dynamoClient = DynamoDBDocumentClient.from(client);
-    this.inboxTableName =
-      process.env.BANKING_INBOX_TABLE_NAME || `BankingSvc-InboxTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly telemetry: TelemetryBundle,
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly config: BankingServiceConfig
+  ) {}
 
   /**
    * Process a withdraw success event with transaction-based inbox pattern
@@ -28,9 +23,6 @@ export class WithdrawSuccessEventHandler {
 
     const now = new Date().toISOString();
 
-    const operationsTableName =
-      process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
-
     const inboxItem: InboxItem = {
       messageId: event.id,
       timestamp: now
@@ -42,7 +34,7 @@ export class WithdrawSuccessEventHandler {
           // a) Inbox insert (IN_PROGRESS)
           {
             Put: {
-              TableName: this.inboxTableName,
+              TableName: this.config.inboxTableName,
               Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
@@ -50,7 +42,7 @@ export class WithdrawSuccessEventHandler {
           // b) Domain state update - Update operation status to COMPLETED
           {
             Update: {
-              TableName: operationsTableName,
+              TableName: this.config.operationsTableName,
               Key: { operationId: event.operationId },
               UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
               ConditionExpression: '#status = :pendingStatus',

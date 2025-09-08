@@ -1,18 +1,15 @@
 import { TelemetryBundle } from '@digital-banking/utils';
 import { DepositEvent } from '@digital-banking/events';
 import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { InboxItem } from '@digital-banking/models';
+import { QueryServiceConfig } from '@digital-banking/config';
 
 export class DepositEventHandler {
-  private dynamoClient: DynamoDBDocumentClient
-  private inboxTableName: string;
-
-  constructor(private readonly telemetry: TelemetryBundle) {
-    this.dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient());
-    this.inboxTableName = 
-      process.env.QUERY_INBOX_TABLE_NAME || `QuerySvc-InboxTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly telemetry: TelemetryBundle,
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly config: QueryServiceConfig
+  ) {}
 
   /**
    * Process a deposit event with transaction-based inbox pattern
@@ -28,13 +25,6 @@ export class DepositEventHandler {
 
     const now = new Date().toISOString();
 
-    const transactionTableName = 
-      process.env.TRANSACTIONS_TABLE_NAME || 
-      `QuerySvc-TransactionsTable-${process.env.ENV || 'dev'}`;
-    
-    const balanceTableName = 
-      process.env.BALANCES_TABLE_NAME || 
-      `QuerySvc-BalancesTable-${process.env.ENV || 'dev'}`;
 
     const inboxItem: InboxItem = {
       messageId: event.id,
@@ -47,7 +37,7 @@ export class DepositEventHandler {
           // a) Inbox insert (IN_PROGRESS)
           {
             Put: {
-              TableName: this.inboxTableName,
+              TableName: this.config.inboxTableName,
               Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
@@ -55,7 +45,7 @@ export class DepositEventHandler {
           // b) Domain state update - Create transaction record
           {
             Put: {
-              TableName: transactionTableName,
+              TableName: this.config.transactionTableName,
               Item: {
                 id: event.operationId,
                 accountId: event.accountId,
@@ -70,7 +60,7 @@ export class DepositEventHandler {
           // c) Update balance with atomic increment (creates record with 0 if not exists)
           {
             Update: {
-              TableName: balanceTableName,
+              TableName: this.config.balanceTableName,
               Key: { accountId: event.accountId },
               UpdateExpression: 'ADD balance :amount SET lastUpdated = :now',
               ExpressionAttributeValues: {

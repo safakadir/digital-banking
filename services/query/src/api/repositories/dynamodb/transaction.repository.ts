@@ -1,4 +1,3 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
   QueryCommand
@@ -13,19 +12,10 @@ const logger = new Logger();
  * DynamoDB implementation of transaction repository
  */
 export class TransactionRepository implements ITransactionRepository {
-  private dynamoClient: DynamoDBDocumentClient;
-  private tableName: string;
-
-  constructor(region = process.env.AWS_REGION || 'us-east-1') {
-    const client = new DynamoDBClient({ region });
-    this.dynamoClient = DynamoDBDocumentClient.from(client, {
-      marshallOptions: {
-        removeUndefinedValues: true
-      }
-    });
-    this.tableName =
-      process.env.TRANSACTIONS_TABLE_NAME || `QuerySvc-TransactionsTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly tableName: string
+  ) {}
 
   /**
    * Get transactions for a specific account

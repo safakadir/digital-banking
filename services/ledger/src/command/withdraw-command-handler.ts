@@ -2,35 +2,17 @@ import { TelemetryBundle } from '@digital-banking/utils';
 import { WithdrawCommand } from '@digital-banking/commands';
 import { WithdrawSuccessEvent, WithdrawFailedEvent } from '@digital-banking/events';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 import { JournalEntry } from '../models/journal-entry';
 import { InboxItem, OutboxItem } from '@digital-banking/models';
+import { LedgerServiceConfig } from '@digital-banking/config';
 
 export class WithdrawCommandHandler {
-  private dynamoClient: DynamoDBDocumentClient;
-  private inboxTableName: string;
-  private ledgerTableName: string;
-  private balanceTableName: string;
-  private outboxTableName: string;
-
-  constructor(private readonly telemetry: TelemetryBundle) {
-    // Initialize DynamoDB client for transactions
-    const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-    this.dynamoClient = DynamoDBDocumentClient.from(client, {
-      marshallOptions: {
-        removeUndefinedValues: true
-      }
-    });
-    this.inboxTableName =
-      process.env.LEDGER_INBOX_TABLE_NAME || `LedgerSvc-InboxTable-${process.env.ENV || 'dev'}`;
-    this.ledgerTableName =
-      process.env.LEDGER_TABLE_NAME || `LedgerSvc-LedgerTable-${process.env.ENV || 'dev'}`;
-    this.balanceTableName =
-      process.env.BALANCE_TABLE_NAME || `LedgerSvc-BalanceTable-${process.env.ENV || 'dev'}`;
-    this.outboxTableName =
-      process.env.OUTBOX_TABLE_NAME || `LedgerSvc-OutboxTable-${process.env.ENV || 'dev'}`;
-  }
+  constructor(
+    private readonly telemetry: TelemetryBundle,
+    private readonly dynamoClient: DynamoDBDocumentClient,
+    private readonly config: LedgerServiceConfig
+  ) {}
 
   /**
    * Process a withdraw command with event sourcing and double-entry bookkeeping
@@ -112,7 +94,7 @@ export class WithdrawCommandHandler {
           // a) Inbox insert (IN_PROGRESS)
           {
             Put: {
-              TableName: this.inboxTableName,
+              TableName: this.config.inboxTableName,
               Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
@@ -120,21 +102,21 @@ export class WithdrawCommandHandler {
           // b) Journal Entry - Debit (Customer Account)
           {
             Put: {
-              TableName: this.ledgerTableName,
+              TableName: this.config.ledgerTableName,
               Item: journalEntryDebit
             }
           },
           // c) Journal Entry - Credit (External Cash)
           {
             Put: {
-              TableName: this.ledgerTableName,
+              TableName: this.config.ledgerTableName,
               Item: journalEntryCredit
             }
           },
           // d) Atomic Balance Decrement with condition check
           {
             Update: {
-              TableName: this.balanceTableName,
+              TableName: this.config.balanceTableName,
               Key: { accountId: command.accountId },
               UpdateExpression: 'ADD balance :negativeAmount SET updatedAt = :now',
               ConditionExpression: 'balance >= :amount', // Atomic condition check
@@ -148,7 +130,7 @@ export class WithdrawCommandHandler {
           // e) Outbox event for success
           {
             Put: {
-              TableName: this.outboxTableName,
+              TableName: this.config.outboxTableName,
               Item: outboxItem
             }
           }
@@ -250,7 +232,7 @@ export class WithdrawCommandHandler {
           // a) Inbox insert (IN_PROGRESS) - try again for failed case
           {
             Put: {
-              TableName: this.inboxTableName,
+              TableName: this.config.inboxTableName,
               Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
@@ -258,7 +240,7 @@ export class WithdrawCommandHandler {
           // b) Outbox event for publishing failed event
           {
             Put: {
-              TableName: this.outboxTableName,
+              TableName: this.config.outboxTableName,
               Item: failedOutboxItem
             }
           }
