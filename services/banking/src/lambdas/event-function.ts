@@ -9,11 +9,13 @@ import {
   WithdrawFailedEvent,
   WithdrawSuccessEvent
 } from '@digital-banking/events';
-import { DepositEventHandler } from '../event/deposit-event-handler';
-import { WithdrawSuccessEventHandler } from '../event/withdraw-success-event-handler';
-import { WithdrawFailedEventHandler } from '../event/withdraw-failed-event-handler';
-import { CreateAccountEventHandler } from '../event/create-account-event-handler';
-import { CloseAccountEventHandler } from '../event/close-account-event-handler';
+import { 
+  DepositEventHandler,
+  WithdrawSuccessEventHandler,
+  WithdrawFailedEventHandler,
+  CreateAccountEventHandler,
+  CloseAccountEventHandler
+} from '../event';
 
 /**
  * Creates an event handler with dependency injection support
