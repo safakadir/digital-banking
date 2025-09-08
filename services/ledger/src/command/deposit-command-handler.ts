@@ -10,7 +10,7 @@ import {
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 import { JournalEntry } from '../models/journal-entry';
-import { OutboxItem } from '@digital-banking/models';
+import { InboxItem, OutboxItem } from '@digital-banking/models';
 
 export class DepositCommandHandler {
   private dynamoClient: DynamoDBDocumentClient;
@@ -106,6 +106,11 @@ export class DepositCommandHandler {
       eventData: depositEvent
     };
 
+    const inboxItem: InboxItem = {
+      messageId: command.id,
+      timestamp: now
+    };
+
     try {
       const transactCommand = new TransactWriteCommand({
         TransactItems: [
@@ -113,13 +118,7 @@ export class DepositCommandHandler {
           {
             Put: {
               TableName: this.inboxTableName,
-              Item: {
-                id: command.id,
-                status: 'IN_PROGRESS',
-                createdAt: now,
-                updatedAt: now,
-                expiration: ttl
-              },
+              Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(id)'
             }
           },
@@ -156,21 +155,6 @@ export class DepositCommandHandler {
             Put: {
               TableName: this.outboxTableName,
               Item: outboxItem
-            }
-          },
-          // f) Inbox status → SUCCESS
-          {
-            Update: {
-              TableName: this.inboxTableName,
-              Key: { id: command.id },
-              UpdateExpression: 'SET #status = :success, updatedAt = :now',
-              ConditionExpression: '#status = :inprogress',
-              ExpressionAttributeNames: { '#status': 'status' },
-              ExpressionAttributeValues: {
-                ':success': 'SUCCESS',
-                ':inprogress': 'IN_PROGRESS',
-                ':now': now
-              }
             }
           }
         ]
@@ -230,20 +214,6 @@ export class DepositCommandHandler {
             reason: 'Command duplicate - inbox record already exists'
           });
           return;
-        }
-
-        // Check if inbox status update failed (item 5) - status inconsistency
-        if (
-          cancellationReasons &&
-          cancellationReasons[5] &&
-          cancellationReasons[5].Code === 'ConditionalCheckFailed'
-        ) {
-          logger.warn('Inbox status update failed - possible race condition', {
-            commandId: command.id,
-            accountId: command.accountId,
-            reason: 'Inbox status not in expected IN_PROGRESS state'
-          });
-          throw error; // Re-throw to trigger retry mechanism
         }
 
         // Fallback for unexpected conditional check failures

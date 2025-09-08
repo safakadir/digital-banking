@@ -36,6 +36,11 @@ export class WithdrawSuccessEventHandler {
       process.env.BALANCE_TABLE_NAME || 
       `QuerySvc-BalanceTable-${process.env.ENV || 'dev'}`;
 
+    const inboxItem: InboxItem = {
+      messageId: event.id,
+      timestamp: now
+    };
+
     try {
       const transactCommand = new TransactWriteCommand({
         TransactItems: [
@@ -43,13 +48,7 @@ export class WithdrawSuccessEventHandler {
           {
             Put: {
               TableName: this.inboxTableName,
-              Item: {
-                messageId: event.id,
-                status: 'IN_PROGRESS',
-                createdAt: now,
-                updatedAt: now,
-                ttl
-              },
+              Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
           },
@@ -78,21 +77,6 @@ export class WithdrawSuccessEventHandler {
               ConditionExpression: 'attribute_exists(accountId)',
               ExpressionAttributeValues: {
                 ':newBalance': event.newBalance,
-                ':now': now
-              }
-            }
-          },
-          // d) Inbox status → SUCCESS
-          {
-            Update: {
-              TableName: this.inboxTableName,
-              Key: { messageId: event.id },
-              UpdateExpression: 'SET #status = :success, updatedAt = :now',
-              ConditionExpression: '#status = :inprogress',
-              ExpressionAttributeNames: { '#status': 'status' },
-              ExpressionAttributeValues: {
-                ':success': 'SUCCESS',
-                ':inprogress': 'IN_PROGRESS',
                 ':now': now
               }
             }
@@ -157,21 +141,6 @@ export class WithdrawSuccessEventHandler {
             reason: 'Account balance does not exist'
           });
           return; // Skip as account might not exist or be closed
-        }
-
-        // Check if inbox status update failed (item 3) - status inconsistency
-        if (
-          cancellationReasons &&
-          cancellationReasons[3] &&
-          cancellationReasons[3].Code === 'ConditionalCheckFailed'
-        ) {
-          logger.warn('Inbox status update failed - possible race condition', {
-            eventId: event.id,
-            accountId: event.accountId,
-            operationId: event.operationId,
-            reason: 'Inbox status not in expected IN_PROGRESS state'
-          });
-          throw error; // Re-throw to trigger retry mechanism
         }
 
         // Fallback for unexpected conditional check failures

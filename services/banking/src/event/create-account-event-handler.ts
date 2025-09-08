@@ -1,6 +1,6 @@
 import { TelemetryBundle } from '@digital-banking/utils';
 import { CreateAccountEvent } from '@digital-banking/events';
-import { AccountStatus } from '@digital-banking/models';
+import { AccountStatus, InboxItem } from '@digital-banking/models';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 
@@ -37,6 +37,11 @@ export class CreateAccountEventHandler {
       process.env.ACCOUNTS_PROJECTION_TABLE_NAME ||
       `BankingSvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
 
+    const inboxItem: InboxItem = {
+      messageId: event.id,
+      timestamp: now
+    };
+
     try {
       const transactCommand = new TransactWriteCommand({
         TransactItems: [
@@ -44,13 +49,7 @@ export class CreateAccountEventHandler {
           {
             Put: {
               TableName: this.inboxTableName,
-              Item: {
-                messageId: event.id,
-                status: 'IN_PROGRESS',
-                createdAt: now,
-                updatedAt: now,
-                ttl
-              },
+              Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
           },
@@ -62,21 +61,6 @@ export class CreateAccountEventHandler {
                 accountId: event.accountId,
                 userId: event.userId,
                 status: AccountStatus.ACTIVE
-              }
-            }
-          },
-          // c) Inbox status → SUCCESS
-          {
-            Update: {
-              TableName: this.inboxTableName,
-              Key: { messageId: event.id },
-              UpdateExpression: 'SET #status = :success, updatedAt = :now',
-              ConditionExpression: '#status = :inprogress',
-              ExpressionAttributeNames: { '#status': 'status' },
-              ExpressionAttributeValues: {
-                ':success': 'SUCCESS',
-                ':inprogress': 'IN_PROGRESS',
-                ':now': now
               }
             }
           }
@@ -120,20 +104,6 @@ export class CreateAccountEventHandler {
             reason: 'Account already exists in projection'
           });
           // Still continue to mark as processed since the end state is correct
-        }
-
-        // Check if inbox status update failed (item 2) - status inconsistency
-        if (
-          cancellationReasons &&
-          cancellationReasons[2] &&
-          cancellationReasons[2].Code === 'ConditionalCheckFailed'
-        ) {
-          logger.warn('Inbox status update failed - possible race condition', {
-            eventId: event.id,
-            accountId: event.accountId,
-            reason: 'Inbox status not in expected IN_PROGRESS state'
-          });
-          throw error; // Re-throw to trigger retry mechanism
         }
 
         // Fallback for unexpected conditional check failures

@@ -5,7 +5,7 @@ import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynam
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 import { JournalEntry } from '../models/journal-entry';
-import { OutboxItem } from '@digital-banking/models';
+import { InboxItem, OutboxItem } from '@digital-banking/models';
 
 export class WithdrawCommandHandler {
   private dynamoClient: DynamoDBDocumentClient;
@@ -78,9 +78,7 @@ export class WithdrawCommandHandler {
       createdAt: now
     };
 
-    // Create withdraw events
     const withdrawSuccessEventId = uuidv4();
-    const withdrawFailedEventId = uuidv4();
 
     // Try atomic withdraw with balance condition check
     try {
@@ -103,6 +101,11 @@ export class WithdrawCommandHandler {
         eventData: withdrawSuccessEvent
       };
 
+      const inboxItem: InboxItem = {
+        messageId: command.id,
+        timestamp: now
+      };
+
       // Attempt atomic transaction with balance condition
       const transactCommand = new TransactWriteCommand({
         TransactItems: [
@@ -110,12 +113,7 @@ export class WithdrawCommandHandler {
           {
             Put: {
               TableName: this.inboxTableName,
-              Item: {
-                id: command.id,
-                status: 'IN_PROGRESS',
-                createdAt: now,
-                updatedAt: now
-              },
+              Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(id)'
             }
           },
@@ -152,21 +150,6 @@ export class WithdrawCommandHandler {
             Put: {
               TableName: this.outboxTableName,
               Item: outboxItem
-            }
-          },
-          // f) Inbox status → SUCCESS
-          {
-            Update: {
-              TableName: this.inboxTableName,
-              Key: { id: command.id },
-              UpdateExpression: 'SET #status = :success, updatedAt = :now',
-              ConditionExpression: '#status = :inprogress',
-              ExpressionAttributeNames: { '#status': 'status' },
-              ExpressionAttributeValues: {
-                ':success': 'SUCCESS',
-                ':inprogress': 'IN_PROGRESS',
-                ':now': now
-              }
             }
           }
         ]
@@ -207,93 +190,8 @@ export class WithdrawCommandHandler {
           cancellationReasons[3] &&
           cancellationReasons[3].Code === 'ConditionalCheckFailed'
         ) {
-          // Insufficient funds - handle as separate transaction
-          const withdrawFailedEvent: WithdrawFailedEvent = {
-            id: withdrawFailedEventId,
-            type: 'WITHDRAW_FAILED_EVENT',
-            timestamp: now,
-            accountId: command.accountId,
-            userId: command.userId,
-            amount: command.amount,
-            operationId: command.operationId,
-            reason: 'Insufficient funds'
-          };
-
-          const failedOutboxItem: OutboxItem = {
-            id: withdrawFailedEvent.id,
-            timestamp: withdrawFailedEvent.timestamp,
-            eventType: withdrawFailedEvent.type,
-            eventData: withdrawFailedEvent
-          };
-
-          // Create separate transaction for failed case (no journal entries, no balance change)
-          const failedTransactCommand = new TransactWriteCommand({
-            TransactItems: [
-              // a) Inbox insert (IN_PROGRESS) - try again for failed case
-              {
-                Put: {
-                  TableName: this.inboxTableName,
-                  Item: {
-                    id: command.id,
-                    status: 'IN_PROGRESS',
-                    createdAt: now,
-                    updatedAt: now
-                  },
-                  ConditionExpression: 'attribute_not_exists(id)'
-                }
-              },
-              // b) Outbox event for publishing failed event
-              {
-                Put: {
-                  TableName: this.outboxTableName,
-                  Item: failedOutboxItem
-                }
-              },
-              // c) Inbox status → SUCCESS
-              {
-                Update: {
-                  TableName: this.inboxTableName,
-                  Key: { id: command.id },
-                  UpdateExpression: 'SET #status = :success, updatedAt = :now',
-                  ConditionExpression: '#status = :inprogress',
-                  ExpressionAttributeNames: { '#status': 'status' },
-                  ExpressionAttributeValues: {
-                    ':success': 'SUCCESS',
-                    ':inprogress': 'IN_PROGRESS',
-                    ':now': now
-                  }
-                }
-              }
-            ]
-          });
-
-          await this.dynamoClient.send(failedTransactCommand);
-          logger.info(
-            'Withdraw command handled successfully - insufficient funds (business rule)',
-            {
-              commandId: command.id,
-              accountId: command.accountId,
-              requestedAmount: command.amount,
-              eventId: withdrawFailedEvent.id,
-              inboxStatus: 'SUCCESS', // Command processing successful
-              businessOutcome: 'FAILED' // Business rule prevented transaction
-            }
-          );
+          this.handleFailedWithdraw(command);
           return;
-        }
-
-        // Check if inbox status update failed (item 5) - status inconsistency
-        if (
-          cancellationReasons &&
-          cancellationReasons[5] &&
-          cancellationReasons[5].Code === 'ConditionalCheckFailed'
-        ) {
-          logger.warn('Inbox status update failed - possible race condition', {
-            commandId: command.id,
-            accountId: command.accountId,
-            reason: 'Inbox status not in expected IN_PROGRESS state'
-          });
-          throw error; // Re-throw to trigger retry mechanism
         }
 
         // Fallback for unexpected conditional check failures
@@ -307,6 +205,80 @@ export class WithdrawCommandHandler {
       }
 
       logger.error('Error processing withdraw command transaction', {
+        error,
+        commandId: command.id,
+        accountId: command.accountId
+      });
+      throw error;
+    }
+  }
+
+  private async handleFailedWithdraw(command: WithdrawCommand): Promise<void> {
+    const { logger } = this.telemetry;
+
+    const now = new Date().toISOString();
+    const withdrawFailedEventId = uuidv4();
+
+    try {
+      // Insufficient funds - handle as separate transaction
+      const withdrawFailedEvent: WithdrawFailedEvent = {
+        id: withdrawFailedEventId,
+        type: 'WITHDRAW_FAILED_EVENT',
+        timestamp: now,
+        accountId: command.accountId,
+        userId: command.userId,
+        amount: command.amount,
+        operationId: command.operationId,
+        reason: 'Insufficient funds'
+      };
+
+      const failedOutboxItem: OutboxItem = {
+        id: withdrawFailedEvent.id,
+        timestamp: withdrawFailedEvent.timestamp,
+        eventType: withdrawFailedEvent.type,
+        eventData: withdrawFailedEvent
+      };
+
+      const inboxItem: InboxItem = {
+        messageId: command.id,
+        timestamp: now
+      };
+
+      // Create separate transaction for failed case (no journal entries, no balance change)
+      const failedTransactCommand = new TransactWriteCommand({
+        TransactItems: [
+          // a) Inbox insert (IN_PROGRESS) - try again for failed case
+          {
+            Put: {
+              TableName: this.inboxTableName,
+              Item: inboxItem,
+              ConditionExpression: 'attribute_not_exists(id)'
+            }
+          },
+          // b) Outbox event for publishing failed event
+          {
+            Put: {
+              TableName: this.outboxTableName,
+              Item: failedOutboxItem
+            }
+          }
+        ]
+      });
+
+      await this.dynamoClient.send(failedTransactCommand);
+      logger.info(
+        'Withdraw command handled successfully - insufficient funds (business rule)',
+        {
+          commandId: command.id,
+          accountId: command.accountId,
+          requestedAmount: command.amount,
+          eventId: withdrawFailedEvent.id,
+          inboxStatus: 'SUCCESS', // Command processing successful
+          businessOutcome: 'FAILED' // Business rule prevented transaction
+          }
+      );
+    } catch (error: any) {
+      logger.error('Error processing withdraw command transaction in failed case', {
         error,
         commandId: command.id,
         accountId: command.accountId

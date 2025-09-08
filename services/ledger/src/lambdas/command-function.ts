@@ -1,6 +1,6 @@
 import { SQSEvent } from 'aws-lambda';
 import { commonEventMiddleware } from '@digital-banking/middleware';
-import { createDefaultTelemetryBundle } from '@digital-banking/utils';
+import { createDefaultTelemetryBundle, transformEventData } from '@digital-banking/utils';
 import { DepositCommandHandler, WithdrawCommandHandler } from '../command';
 import { BankingCommand } from '@digital-banking/commands';
 
@@ -25,11 +25,15 @@ export function createCommandFunctionHandler(telemetry = createDefaultTelemetryB
 
     for (const record of event.Records) {
       try {
-        const message = JSON.parse(record.body) as BankingCommand;
+        const body = JSON.parse(record.body);
+        
+        // Transform the event data from DynamoDB format to plain format
+        const message = transformEventData(body.eventData) as BankingCommand;
+
         logger.info('Processing command', {
-          messageId: record.messageId,
+          sqsMessageId: record.messageId,
           commandType: message.type,
-          messageUuid: message.id
+          commandBody: message
         });
 
         switch (message.type) {

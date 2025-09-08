@@ -1,6 +1,6 @@
 import { TelemetryBundle } from '@digital-banking/utils';
 import { CloseAccountEvent } from '@digital-banking/events';
-import { AccountStatus } from '@digital-banking/models';
+import { AccountStatus, InboxItem } from '@digital-banking/models';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 
@@ -33,6 +33,11 @@ export class CloseAccountEventHandler {
       process.env.ACCOUNTS_PROJECTION_TABLE_NAME ||
       `BankingSvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
 
+    const inboxItem: InboxItem = {
+      messageId: event.id,
+      timestamp: now
+    };
+
     try {
       const transactCommand = new TransactWriteCommand({
         TransactItems: [
@@ -40,13 +45,7 @@ export class CloseAccountEventHandler {
           {
             Put: {
               TableName: this.inboxTableName,
-              Item: {
-                messageId: event.id,
-                status: 'IN_PROGRESS',
-                createdAt: now,
-                updatedAt: now,
-                ttl
-              },
+              Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
           },
@@ -65,21 +64,7 @@ export class CloseAccountEventHandler {
               }
             }
           },
-          // c) Inbox status → SUCCESS
-          {
-            Update: {
-              TableName: this.inboxTableName,
-              Key: { messageId: event.id },
-              UpdateExpression: 'SET #status = :success, updatedAt = :now',
-              ConditionExpression: '#status = :inprogress',
-              ExpressionAttributeNames: { '#status': 'status' },
-              ExpressionAttributeValues: {
-                ':success': 'SUCCESS',
-                ':inprogress': 'IN_PROGRESS',
-                ':now': now
-              }
-            }
-          }
+
         ]
       });
 
@@ -119,20 +104,6 @@ export class CloseAccountEventHandler {
             reason: 'Account does not exist or already closed'
           });
           return; // Skip as account might already be closed or doesn't exist
-        }
-
-        // Check if inbox status update failed (item 2) - status inconsistency
-        if (
-          cancellationReasons &&
-          cancellationReasons[2] &&
-          cancellationReasons[2].Code === 'ConditionalCheckFailed'
-        ) {
-          logger.warn('Inbox status update failed - possible race condition', {
-            eventId: event.id,
-            accountId: event.accountId,
-            reason: 'Inbox status not in expected IN_PROGRESS state'
-          });
-          throw error; // Re-throw to trigger retry mechanism
         }
 
         // Fallback for unexpected conditional check failures

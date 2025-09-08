@@ -2,6 +2,7 @@ import { TelemetryBundle } from '@digital-banking/utils';
 import { WithdrawSuccessEvent } from '@digital-banking/events';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { InboxItem } from '@digital-banking/models';
 
 export class WithdrawSuccessEventHandler {
   private dynamoClient: DynamoDBDocumentClient;
@@ -31,6 +32,11 @@ export class WithdrawSuccessEventHandler {
     const operationsTableName =
       process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
 
+    const inboxItem: InboxItem = {
+      messageId: event.id,
+      timestamp: now
+    };
+
     try {
       const transactCommand = new TransactWriteCommand({
         TransactItems: [
@@ -38,13 +44,7 @@ export class WithdrawSuccessEventHandler {
           {
             Put: {
               TableName: this.inboxTableName,
-              Item: {
-                messageId: event.id,
-                status: 'IN_PROGRESS',
-                createdAt: now,
-                updatedAt: now,
-                ttl
-              },
+              Item: inboxItem,
               ConditionExpression: 'attribute_not_exists(messageId)'
             }
           },
@@ -62,21 +62,6 @@ export class WithdrawSuccessEventHandler {
                 ':status': 'completed',
                 ':updatedAt': now,
                 ':pendingStatus': 'pending'
-              }
-            }
-          },
-          // c) Inbox status → SUCCESS
-          {
-            Update: {
-              TableName: this.inboxTableName,
-              Key: { messageId: event.id },
-              UpdateExpression: 'SET #status = :success, updatedAt = :now',
-              ConditionExpression: '#status = :inprogress',
-              ExpressionAttributeNames: { '#status': 'status' },
-              ExpressionAttributeValues: {
-                ':success': 'SUCCESS',
-                ':inprogress': 'IN_PROGRESS',
-                ':now': now
               }
             }
           }
@@ -119,20 +104,6 @@ export class WithdrawSuccessEventHandler {
             reason: 'Operation already completed, failed, or does not exist'
           });
           return; // Skip as operation might already be processed or in wrong state
-        }
-
-        // Check if inbox status update failed (item 2) - status inconsistency
-        if (
-          cancellationReasons &&
-          cancellationReasons[2] &&
-          cancellationReasons[2].Code === 'ConditionalCheckFailed'
-        ) {
-          logger.warn('Inbox status update failed - possible race condition', {
-            eventId: event.id,
-            operationId: event.operationId,
-            reason: 'Inbox status not in expected IN_PROGRESS state'
-          });
-          throw error; // Re-throw to trigger retry mechanism
         }
 
         // Fallback for unexpected conditional check failures
