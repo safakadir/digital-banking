@@ -2,36 +2,16 @@
 
 A simple digital banking platform with event-driven microservices architecture built using Node.js, TypeScript, and AWS services with SAM CLI.
 
-## Project Structure
 
-```
-digital-banking/
-├── services/
-│   ├── banking/        # Banking service for user operations
-│   ├── ledger/         # Ledger service for transactions
-│   ├── accounts/       # Account management service
-│   ├── query/          # Query service for reading data
-│   └── notifications/  # Notifications service (not implemented)
-├── shared/
-│   ├── models/         # Shared data models
-│   ├── utils/          # Shared utilities
-│   ├── events/         # Event definitions
-│   └── constants/      # Shared constants
-├── template.yaml       # SAM template
-├── tsconfig.base.json  # Base TypeScript configuration
-└── turbo.json          # Turborepo configuration
-```
+## Quick Start
 
-It's a monorepo project managed by turborepo.
-Since it's a monorepo, SAM templates will be placed in the root folder as central template for ease of use.
+### Prerequisites
 
-## Prerequisites
-
-- Node.js 18+
+- Node.js 22+
 - AWS SAM CLI
 - AWS CLI configured with appropriate credentials
 
-## Setup
+### Setup
 
 1. Install dependencies:
 
@@ -45,13 +25,21 @@ npm install
 npm run build
 ```
 
-## Local Development
+### Deployment
 
 ```bash
-npm run dev
+npm run deploy
 ```
 
-This will start the TypeScript compiler in watch mode for all services.
+This will deploy the services to AWS with SAM.
+
+### Local Development
+
+```bash
+npm run dev:shared
+```
+
+This will start the TypeScript compiler in watch mode for shared services.
 
 To start the API locally:
 
@@ -59,28 +47,45 @@ To start the API locally:
 sam local start-api
 ```
 
-## Deployment
+*NOTE: Local resources needed. Only api endpoints is available.*
 
-```bash
-npm run deploy
-```
 
-## Authentication
+## Demo
+
+Live at: https://mfwz73pfc3.execute-api.eu-central-1.amazonaws.com/dev
+
+### Get Authenticated
 
 ```bash
 aws cognito-idp admin-set-user-password \
-  --user-pool-id <USER_POOL_ID> \
+  --user-pool-id eu-central-1_THiAwfqNO \
   --username test@mail.com \
   --password Aa123456 \
   --permanent
 ```
 
-```bash
-aws cognito-idp initiate-auth \
-  --client-id <CLIENT_ID> \
-  --auth-flow USER_PASSWORD_AUTH \
-  --auth-parameters USERNAME=test@mail.com,PASSWORD=Aa123456
-```
+Get `IdToken` from the response and use it as *Bearer Token* in `Authorization` header of API requests.
+
+### API Endpoinst
+
+Accounts
+- `POST /accounts` - Create new account
+- `GET /accounts` - List all user accounts
+- `GET /accounts/{account_id}` - Get account details
+- `PUT /accounts/{account_id}/close` - Close account
+
+Banking Operations
+- `POST /deposit` - Deposit money
+- `POST /withdraw` - Withdraw money
+- `GET /operation-status/{operation_id}` - Get operation status
+
+Query Operations
+- `GET /transactions/{account_id}` - Get account transaction history
+- `GET /balances/{account_id}` - Get account balance
+- `GET /balances` - Get all user account balances
+
+Find detailed descriptions in [Openapi Spec file](./docs/api-contract.yaml).
+
 
 ## Architecture
 
@@ -90,53 +95,73 @@ This project follows an event-driven microservices architecture with the followi
 - **Ledger Service**: Single source of truth for transactions
 - **Accounts Service**: Manages account information
 - **Query Service**: For reading/querying balances and transaction histories
-- **Notifications Service**: For sending notifications (not implemented)
 
 ![Event Driven Architecture](./docs/EDA.png)
 
-### Architectural Concepts 
+### Messages
 
-- Event-driven architecture
-- Microservices architecture
-- Outbox pattern: Handled by DynamoDB Streams
-- Inbox pattern: Handled by Powertools's IdempotentHandler
-- CQRS: Commands and Queries are separated
+**Accounts Service**:
+Commands Received: N/A
+Commands Sent: N/A
+Events Emitted: `CREATE_ACCOUNT_EVENT`, `CLOSE_ACCOUNT_EVENT`
+Events Received: N/A
+
+**Banking Service**:
+Commands Received: N/A
+Commands Sent: `DEPOSIT_CMD`, `WITHDRAW_CMD`
+Events Emitted: N/A
+Events Received: `DEPOSIT_EVENT`, `WITHDRAW_SUCCESS_EVENT`, `WITHDRAW_FAILED_EVENT`, `CREATE_ACCOUNT_EVENT`, `CLOSE_ACCOUNT_EVENT`
+
+**Ledger Service**:
+Commands Received: `DEPOSIT_CMD`, `WITHDRAW_CMD`
+Commands Sent: N/A
+Events Emitted: `DEPOSIT_EVENT`, `WITHDRAW_SUCCESS_EVENT`, `WITHDRAW_FAILED_EVENT`
+Events Received: N/A
+
+**Query Service**:
+Commands Received: N/A
+Commands Sent: N/A
+Events Emitted: N/A
+Events Received: `DEPOSIT_EVENT`, `WITHDRAW_SUCCESS_EVENT`, `WITHDRAW_FAILED_EVENT`, `CREATE_ACCOUNT_EVENT`, `CLOSE_ACCOUNT_EVENT`
+
+### Architectural Notes 
+
+- Message(Event/Command) handling and API request handling are separated.
+- Outbox pattern used to not loose messages.
+  - Method: Outbox Table -> DynamoDB Streams -> EventBridge Pipes -> optionally SNS(if fan out needed) -> SQS -> Target Lambda Functions (Event or Command Handler)
+  - EventBridge Pipes was the only way to wire up DynamoDB Streams to SQS and SNS.
+  - Domain operations and writing to outbox is atomic (single transaction).
+- Inbox pattern used to handle idempotency.
+  - Method: SQS Queue -> Lambda Functions (Event or Command Handler) --> Transaction Start -> Inbox Table Insert wiht Idempotency Check -> Domain Operations -> Transaction Commit
+  - Domain operations and inbox management is atomic (single transaction).
+- CQRS: Commands and Queries are separated 
 - Event Sourcing: Append-only transactions
+- Transaction Isolation: Serializable
+- `/lambdas` folders are entry layer for all services. Then lambda events (api or event/command) are routed to their respective handlers.
+  - `/api` folder is n-tier architecture for handling API requests.
+  - `/event` or `/command` folder is message handling layer. Then message handlers are responsible for domain operations and writing to outbox.
+  - Because of the nature and transaction capability limitations of *DynamoDB*, a database driven architecture is used in event/command handlers.
 
-N-Tier Architecture vs. Onion Architecture:
-- For the sake of simplicity and for avoiding boilerplate, N-Tier Architecture is used for this assignment.
-- But it can be transformed to Onion Architecture with some refactoring later, if needed with incoming complexity.
-- Handlers are provided inline in entry points(lambdas) as they're simple and straightforward. They can be extracted to separate files if needed.
-
-## API Endpoints
-
-### Accounts
-- `POST /accounts` - Create new account
-- `GET /accounts` - List all user accounts
-- `GET /accounts/{account_id}` - Get account details
-- `PUT /accounts/{account_id}/close` - Close account
-
-### Banking Operations
-- `POST /deposit` - Deposit money
-- `POST /withdraw` - Withdraw money
-- `GET /operation-status/{operation_id}` - Get operation status
-
-### Query Operations
-- `GET /transactions/{account_id}` - Get account transaction history
-- `GET /balances/{account_id}` - Get account balance
-- `GET /balances` - Get all user account balances
 
 ## Technologies Used
 
 - TypeScript
 - Node.js
+- Turborepo
+- Webpack
+- AWS SAM
 - AWS Lambda
-- AWS API Gateway
 - AWS DynamoDB
 - AWS SQS
+- AWS SNS
 - AWS Cognito
-- AWS SAM
-- Turborepo
 - AWS Lambda Powertools
-- InversifyJS (for DI in Banking Service)
-- Jest (for testing)
+
+
+## Future Improvements
+
+- Add unit and integration tests.
+- Improve observability and ensure X-Ray tracing.
+- Add notification service.
+- Add CI/CD pipelines.
+- Local development resources and local orchestration.
