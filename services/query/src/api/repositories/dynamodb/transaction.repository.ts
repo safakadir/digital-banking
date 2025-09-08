@@ -1,8 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
-  QueryCommand,
-  PutCommand
+  QueryCommand
 } from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Transaction } from '@digital-banking/models';
@@ -35,6 +34,7 @@ export class TransactionRepository implements ITransactionRepository {
     try {
       const command = new QueryCommand({
         TableName: this.tableName,
+        IndexName: 'account-timestamp-lsi', // Use the timestamp-based LSI
         KeyConditionExpression: 'accountId = :accountId',
         ExpressionAttributeValues: {
           ':accountId': accountId
@@ -51,49 +51,6 @@ export class TransactionRepository implements ITransactionRepository {
       return transactions;
     } catch (error) {
       logger.error('Error getting transactions', { error, accountId, limit, offset });
-      throw error;
-    }
-  }
-
-  /**
-   * Create a new transaction record
-   */
-  async create(transaction: Transaction): Promise<void> {
-    try {
-      const command = new PutCommand({
-        TableName: this.tableName,
-        Item: transaction
-      });
-
-      await this.dynamoClient.send(command);
-      logger.info('Transaction created', { transactionId: transaction.id, accountId: transaction.accountId });
-    } catch (error) {
-      logger.error('Error creating transaction', { error, transaction });
-      throw error;
-    }
-  }
-
-  /**
-   * Get total transaction count for an account
-   */
-  async getCountByAccountId(accountId: string): Promise<number> {
-    try {
-      const command = new QueryCommand({
-        TableName: this.tableName,
-        KeyConditionExpression: 'accountId = :accountId',
-        ExpressionAttributeValues: {
-          ':accountId': accountId
-        },
-        Select: 'COUNT'
-      });
-
-      const result = await this.dynamoClient.send(command);
-      const count = result.Count || 0;
-
-      logger.info('Transaction count retrieved', { accountId, count });
-      return count;
-    } catch (error) {
-      logger.error('Error getting transaction count', { error, accountId });
       throw error;
     }
   }
