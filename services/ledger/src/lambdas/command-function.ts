@@ -1,9 +1,8 @@
 import { SQSEvent } from 'aws-lambda';
-import { createLedgerService } from '../services';
 import { commonEventMiddleware } from '@digital-banking/middleware';
 import { createDefaultTelemetryBundle } from '@digital-banking/utils';
-import { depositCommandHandler } from './command-handlers/deposit-command-handler';
-import { withdrawCommandHandler } from './command-handlers/withdraw-command-handler';
+import { DepositCommandHandler } from '../command/deposit-command-handler';
+import { WithdrawCommandHandler } from '../command/withdraw-command-handler';
 import { BankingCommand } from '@digital-banking/commands';
 import { IdempotencyConfig, makeIdempotent } from '@aws-lambda-powertools/idempotency';
 import { DynamoDBPersistenceLayer } from '@aws-lambda-powertools/idempotency/dynamodb';
@@ -22,14 +21,10 @@ const idempotencyConfig = new IdempotencyConfig({
 
 /**
  * Creates a command handler with dependency injection support
- * @param ledgerService - LedgerService instance
- * @param logger - Logger instance
- * @param tracer - Tracer instance
- * @param metrics - Metrics instance
+ * @param telemetry - TelemetryBundle instance
  * @returns Command handler function
  */
 export function createCommandFunctionHandler(
-  ledgerService = createLedgerService(),
   telemetry = createDefaultTelemetryBundle()
 ) {
   const { logger } = telemetry;
@@ -54,10 +49,10 @@ export function createCommandFunctionHandler(
 
         switch (message.type) {
           case 'DEPOSIT_CMD':
-            await depositCommandHandler(ledgerService, telemetry)(message);
+            await new DepositCommandHandler(telemetry).handle(message);
             break;
           case 'WITHDRAW_CMD':
-            await withdrawCommandHandler(ledgerService, telemetry)(message);
+            await new WithdrawCommandHandler(telemetry).handle(message);
             break;
           default:
             // Exhaustive check to ensure all command types are handled

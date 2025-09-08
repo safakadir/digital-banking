@@ -1,7 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
-import { Account, AccountStatus } from '@digital-banking/models';
+import { Account, AccountStatus, OutboxItem } from '@digital-banking/models';
 import { CreateAccountEvent, CloseAccountEvent } from '@digital-banking/events';
 import { IAccountRepository } from '../interfaces';
 
@@ -78,12 +78,11 @@ export class AccountRepository implements IAccountRepository {
   async createWithEvent(account: Account, event: CreateAccountEvent): Promise<void> {
     try {
       // Create outbox item
-      const outboxItem = {
+      const outboxItem: OutboxItem = {
         id: event.id,
         timestamp: event.timestamp,
         eventType: event.type,
-        eventData: event,
-        processed: false
+        eventData: event
       };
 
       // Atomic transaction: Write to both accounts table and outbox table
@@ -121,12 +120,11 @@ export class AccountRepository implements IAccountRepository {
       const now = new Date().toISOString();
       
       // Create outbox item
-      const outboxItem = {
+      const outboxItem: OutboxItem = {
         id: event.id,
         timestamp: event.timestamp,
         eventType: event.type,
-        eventData: event,
-        processed: false
+        eventData: event
       };
 
       let updateExpression = 'SET #status = :status, #updatedAt = :updatedAt';

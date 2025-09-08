@@ -1,7 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
-import { Operation } from '@digital-banking/models';
+import { Operation, OutboxItem } from '@digital-banking/models';
 import { DepositCommand, WithdrawCommand } from '@digital-banking/commands';
 import { IOperationRepository } from '../interfaces';
 
@@ -53,12 +53,11 @@ export class OperationRepository implements IOperationRepository {
   async createWithCommand(operation: Operation, command: DepositCommand | WithdrawCommand): Promise<void> {
     try {
       // Create outbox item
-      const outboxItem = {
+      const outboxItem: OutboxItem = {
         id: command.id,
         timestamp: command.timestamp,
         eventType: command.type,
-        eventData: command,
-        processed: false
+        eventData: command
       };
 
       // Atomic transaction: Write to both operations table and outbox table

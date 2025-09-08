@@ -8,3 +8,4 @@ export * from './transaction';
 export * from './transactions-response';
 export * from './balance';
 export * from './balance-with-account-info';
+export * from './outbox-item';
