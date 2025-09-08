@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Operation, OutboxItem } from '@digital-banking/models';
 import { DepositCommand, WithdrawCommand } from '@digital-banking/commands';
@@ -18,8 +18,10 @@ export class OperationRepository implements IOperationRepository {
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
     this.dynamoClient = DynamoDBDocumentClient.from(client);
-    this.tableName = process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
-    this.outboxTableName = process.env.BANKING_OUTBOX_TABLE || `BankingSvc-OutboxTable-${process.env.ENV || 'dev'}`;
+    this.tableName =
+      process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
+    this.outboxTableName =
+      process.env.BANKING_OUTBOX_TABLE || `BankingSvc-OutboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**
@@ -33,7 +35,7 @@ export class OperationRepository implements IOperationRepository {
       });
 
       const result = await this.dynamoClient.send(command);
-      
+
       if (!result.Item) {
         logger.warn('Operation not found', { operationId });
         return null;
@@ -50,7 +52,10 @@ export class OperationRepository implements IOperationRepository {
   /**
    * Create operation and send command atomically using outbox pattern
    */
-  async createWithCommand(operation: Operation, command: DepositCommand | WithdrawCommand): Promise<void> {
+  async createWithCommand(
+    operation: Operation,
+    command: DepositCommand | WithdrawCommand
+  ): Promise<void> {
     try {
       // Create outbox item
       const outboxItem: OutboxItem = {
@@ -79,11 +84,11 @@ export class OperationRepository implements IOperationRepository {
       });
 
       await this.dynamoClient.send(transactCommand);
-      logger.info('Operation created atomically with command outbox', { 
-        operationId: operation.operationId, 
-        type: operation.type, 
-        accountId: operation.accountId, 
-        commandId: command.id 
+      logger.info('Operation created atomically with command outbox', {
+        operationId: operation.operationId,
+        type: operation.type,
+        accountId: operation.accountId,
+        commandId: command.id
       });
     } catch (error) {
       logger.error('Error creating operation with command outbox', { error, operation, command });

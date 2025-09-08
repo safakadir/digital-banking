@@ -9,11 +9,13 @@ import { TelemetryBundle } from '@digital-banking/utils';
  */
 export const errorHandlerMiddleware = (telemetry: TelemetryBundle) => {
   const { logger } = telemetry;
-  const onError: middy.MiddlewareFn<APIGatewayProxyEvent, APIGatewayProxyResult> = async (request) => {
+  const onError: middy.MiddlewareFn<APIGatewayProxyEvent, APIGatewayProxyResult> = async (
+    request
+  ) => {
     const { error } = request;
-    
+
     logger.error('Error in request handler', { error });
-    
+
     // Handle known error types
     if (error instanceof BaseError) {
       request.response = {
@@ -22,7 +24,7 @@ export const errorHandlerMiddleware = (telemetry: TelemetryBundle) => {
       };
       return;
     }
-    
+
     // Default error response for unexpected errors
     request.response = {
       statusCode: 500,

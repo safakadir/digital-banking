@@ -1,6 +1,5 @@
-import { AccountService } from "./account-service";
-import { AccountRepository } from "./repositories";
-
+import { AccountService } from './account-service';
+import { AccountRepository } from './repositories';
 
 /**
  * Creates an AccountService instance with its dependencies

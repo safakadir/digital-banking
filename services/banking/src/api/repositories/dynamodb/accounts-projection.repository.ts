@@ -14,7 +14,9 @@ export class AccountsProjectionRepository implements IAccountsProjectionReposito
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
     this.dynamoClient = DynamoDBDocumentClient.from(client);
-    this.tableName = process.env.ACCOUNTS_PROJECTION_TABLE_NAME || `BankingSvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
+    this.tableName =
+      process.env.ACCOUNTS_PROJECTION_TABLE_NAME ||
+      `BankingSvc-AccountsProjectionTable-${process.env.ENV || 'dev'}`;
   }
 
   /**
@@ -28,7 +30,7 @@ export class AccountsProjectionRepository implements IAccountsProjectionReposito
       });
 
       const result = await this.dynamoClient.send(command);
-      
+
       if (!result.Item) {
         logger.warn('Account projection not found', { accountId });
         return null;
@@ -56,26 +58,26 @@ export class AccountsProjectionRepository implements IAccountsProjectionReposito
   async validateOwnership(accountId: string, userId: string): Promise<boolean> {
     try {
       const accountProjection = await this.getById(accountId);
-      
+
       if (!accountProjection) {
         logger.warn('Account projection not found for ownership validation', { accountId, userId });
         return false;
       }
 
       if (accountProjection.userId !== userId) {
-        logger.warn('Account ownership validation failed - wrong user', { 
-          accountId, 
-          userId, 
-          accountUserId: accountProjection.userId 
+        logger.warn('Account ownership validation failed - wrong user', {
+          accountId,
+          userId,
+          accountUserId: accountProjection.userId
         });
         return false;
       }
 
       if (accountProjection.status !== AccountStatus.ACTIVE) {
-        logger.warn('Account ownership validation failed - account not active', { 
-          accountId, 
-          userId, 
-          status: accountProjection.status 
+        logger.warn('Account ownership validation failed - account not active', {
+          accountId,
+          userId,
+          status: accountProjection.status
         });
         return false;
       }

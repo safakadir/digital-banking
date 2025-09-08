@@ -18,21 +18,21 @@ export function createApiFunctionHandler(
   telemetry = createDefaultTelemetryBundle()
 ) {
   return httpRouter([
-  {
-    method: 'GET',
-    path: '/transactions/{account_id}',
-    handler: getTransactionsHandler(queryService, telemetry)
-  },
-  {
-    method: 'GET',
-    path: '/balances/{account_id}',
-    handler: getBalanceHandler(queryService, telemetry)
-  },
-  {
-    method: 'GET',
-    path: '/balances',
-    handler: getBalancesHandler(queryService, telemetry)
-  }
+    {
+      method: 'GET',
+      path: '/transactions/{account_id}',
+      handler: getTransactionsHandler(queryService, telemetry)
+    },
+    {
+      method: 'GET',
+      path: '/balances/{account_id}',
+      handler: getBalanceHandler(queryService, telemetry)
+    },
+    {
+      method: 'GET',
+      path: '/balances',
+      handler: getBalancesHandler(queryService, telemetry)
+    }
   ]);
 }
 

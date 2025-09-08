@@ -1,6 +1,4 @@
-import { DepositCommand } from "./deposit-command";
-import { WithdrawCommand } from "./withdraw-command";
+import { DepositCommand } from './deposit-command';
+import { WithdrawCommand } from './withdraw-command';
 
-export type BankingCommand = 
-  | DepositCommand 
-  | WithdrawCommand;
+export type BankingCommand = DepositCommand | WithdrawCommand;

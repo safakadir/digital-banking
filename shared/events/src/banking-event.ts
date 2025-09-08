@@ -8,4 +8,9 @@ import { CloseAccountEvent } from './close-account-event';
  * Union type of all banking events
  */
 
-export type BankingEvent = DepositEvent | WithdrawSuccessEvent | WithdrawFailedEvent | CreateAccountEvent | CloseAccountEvent;
+export type BankingEvent =
+  | DepositEvent
+  | WithdrawSuccessEvent
+  | WithdrawFailedEvent
+  | CreateAccountEvent
+  | CloseAccountEvent;

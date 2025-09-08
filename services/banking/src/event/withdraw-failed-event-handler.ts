@@ -6,12 +6,13 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 export class WithdrawFailedEventHandler {
   private dynamoClient: DynamoDBDocumentClient;
   private inboxTableName: string;
-  
+
   constructor(private readonly telemetry: TelemetryBundle) {
     // Initialize DynamoDB client for transactions
     const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
     this.dynamoClient = DynamoDBDocumentClient.from(client);
-    this.inboxTableName = process.env.BANKING_INBOX_TABLE || `BankingSvc-InboxTable-${process.env.ENV || 'dev'}`;
+    this.inboxTableName =
+      process.env.BANKING_INBOX_TABLE || `BankingSvc-InboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**
@@ -19,14 +20,17 @@ export class WithdrawFailedEventHandler {
    */
   async handle(event: WithdrawFailedEvent): Promise<void> {
     const { logger } = this.telemetry;
-  
-    logger.info('Processing withdraw failed event with transaction-based inbox pattern', { eventId: event.id });
-    
+
+    logger.info('Processing withdraw failed event with transaction-based inbox pattern', {
+      eventId: event.id
+    });
+
     const now = new Date().toISOString();
-    const ttl = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 24 hours TTL
-    
-    const operationsTableName = process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
-    
+    const ttl = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours TTL
+
+    const operationsTableName =
+      process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
+
     try {
       const transactCommand = new TransactWriteCommand({
         TransactItems: [
@@ -49,7 +53,8 @@ export class WithdrawFailedEventHandler {
             Update: {
               TableName: operationsTableName,
               Key: { operationId: event.operationId },
-              UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt, errorMessage = :errorMessage',
+              UpdateExpression:
+                'SET #status = :status, updatedAt = :updatedAt, errorMessage = :errorMessage',
               ConditionExpression: '#status = :pendingStatus',
               ExpressionAttributeNames: {
                 '#status': 'status'
@@ -70,10 +75,10 @@ export class WithdrawFailedEventHandler {
               UpdateExpression: 'SET #status = :success, updatedAt = :now',
               ConditionExpression: '#status = :inprogress',
               ExpressionAttributeNames: { '#status': 'status' },
-              ExpressionAttributeValues: { 
-                ':success': 'SUCCESS', 
-                ':inprogress': 'IN_PROGRESS', 
-                ':now': now 
+              ExpressionAttributeValues: {
+                ':success': 'SUCCESS',
+                ':inprogress': 'IN_PROGRESS',
+                ':now': now
               }
             }
           }
@@ -81,29 +86,36 @@ export class WithdrawFailedEventHandler {
       });
 
       await this.dynamoClient.send(transactCommand);
-      logger.info('Withdraw failed event processed successfully with transaction', { 
-        eventId: event.id, 
+      logger.info('Withdraw failed event processed successfully with transaction', {
+        eventId: event.id,
         operationId: event.operationId,
         reason: event.reason
       });
-      
     } catch (error: any) {
       if (error.name === 'ConditionalCheckFailedException') {
         // Use CancellationReasons to determine which condition failed
         const cancellationReasons = error.CancellationReasons;
-        
+
         // Check if inbox insert failed (item 0) - event already processed
-        if (cancellationReasons && cancellationReasons[0] && cancellationReasons[0].Code === 'ConditionalCheckFailed') {
-          logger.info('Withdraw failed event already processed, skipping', { 
-            eventId: event.id, 
+        if (
+          cancellationReasons &&
+          cancellationReasons[0] &&
+          cancellationReasons[0].Code === 'ConditionalCheckFailed'
+        ) {
+          logger.info('Withdraw failed event already processed, skipping', {
+            eventId: event.id,
             operationId: event.operationId,
             reason: 'Event duplicate - inbox record already exists'
           });
           return;
         }
-        
+
         // Check if operation update failed (item 1) - operation not in pending state
-        if (cancellationReasons && cancellationReasons[1] && cancellationReasons[1].Code === 'ConditionalCheckFailed') {
+        if (
+          cancellationReasons &&
+          cancellationReasons[1] &&
+          cancellationReasons[1].Code === 'ConditionalCheckFailed'
+        ) {
           logger.warn('Operation not in pending state for withdraw failed event', {
             eventId: event.id,
             operationId: event.operationId,
@@ -111,9 +123,13 @@ export class WithdrawFailedEventHandler {
           });
           return; // Skip as operation might already be processed or in wrong state
         }
-        
+
         // Check if inbox status update failed (item 2) - status inconsistency
-        if (cancellationReasons && cancellationReasons[2] && cancellationReasons[2].Code === 'ConditionalCheckFailed') {
+        if (
+          cancellationReasons &&
+          cancellationReasons[2] &&
+          cancellationReasons[2].Code === 'ConditionalCheckFailed'
+        ) {
           logger.warn('Inbox status update failed - possible race condition', {
             eventId: event.id,
             operationId: event.operationId,
@@ -121,24 +137,23 @@ export class WithdrawFailedEventHandler {
           });
           throw error; // Re-throw to trigger retry mechanism
         }
-        
+
         // Fallback for unexpected conditional check failures
         logger.error('Unexpected conditional check failure', {
           eventId: event.id,
           operationId: event.operationId,
-          cancellationReasons: cancellationReasons,
+          cancellationReasons,
           error: error.message
         });
         throw error;
-        
       }
-      
-      logger.error('Error processing withdraw failed event transaction', { 
-        error, 
-        eventId: event.id, 
-        operationId: event.operationId 
+
+      logger.error('Error processing withdraw failed event transaction', {
+        error,
+        eventId: event.id,
+        operationId: event.operationId
       });
       throw error;
     }
   }
-};
+}

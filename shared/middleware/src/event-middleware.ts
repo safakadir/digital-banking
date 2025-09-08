@@ -7,7 +7,7 @@ import { TelemetryBundle } from '@digital-banking/utils';
 /**
  * Common middleware for event handlers
  * Provides AWS Lambda Powertools integration for event processing
- * 
+ *
  * @param handler - Lambda event handler function
  * @param logger - Powertools logger instance
  * @param tracer - Powertools tracer instance

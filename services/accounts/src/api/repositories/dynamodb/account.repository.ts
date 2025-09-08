@@ -1,5 +1,10 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  QueryCommand,
+  TransactWriteCommand
+} from '@aws-sdk/lib-dynamodb';
 import { Logger } from '@aws-lambda-powertools/logger';
 import { Account, AccountStatus, OutboxItem } from '@digital-banking/models';
 import { CreateAccountEvent, CloseAccountEvent } from '@digital-banking/events';
@@ -18,8 +23,10 @@ export class AccountRepository implements IAccountRepository {
   constructor(region = process.env.AWS_REGION || 'us-east-1') {
     const client = new DynamoDBClient({ region });
     this.dynamoClient = DynamoDBDocumentClient.from(client);
-    this.tableName = process.env.ACCOUNTS_TABLE_NAME || `AccountsSvc-AccountsTable-${process.env.ENV || 'dev'}`;
-    this.outboxTableName = process.env.ACCOUNTS_OUTBOX_TABLE || `AccountsSvc-OutboxTable-${process.env.ENV || 'dev'}`;
+    this.tableName =
+      process.env.ACCOUNTS_TABLE_NAME || `AccountsSvc-AccountsTable-${process.env.ENV || 'dev'}`;
+    this.outboxTableName =
+      process.env.ACCOUNTS_OUTBOX_TABLE || `AccountsSvc-OutboxTable-${process.env.ENV || 'dev'}`;
   }
 
   /**
@@ -33,7 +40,7 @@ export class AccountRepository implements IAccountRepository {
       });
 
       const result = await this.dynamoClient.send(command);
-      
+
       if (!result.Item) {
         logger.warn('Account not found', { accountId });
         return null;
@@ -63,7 +70,7 @@ export class AccountRepository implements IAccountRepository {
 
       const result = await this.dynamoClient.send(command);
       const accounts = (result.Items || []) as Account[];
-      
+
       logger.info('Accounts retrieved for user', { userId, count: accounts.length });
       return accounts;
     } catch (error) {
@@ -105,9 +112,15 @@ export class AccountRepository implements IAccountRepository {
       });
 
       await this.dynamoClient.send(transactCommand);
-      logger.info('Account created atomically with outbox event', { accountId: account.accountId, eventId: event.id });
+      logger.info('Account created atomically with outbox event', {
+        accountId: account.accountId,
+        eventId: event.id
+      });
     } catch (error) {
-      logger.error('Error creating account with outbox event', { error, accountId: account.accountId });
+      logger.error('Error creating account with outbox event', {
+        error,
+        accountId: account.accountId
+      });
       throw error;
     }
   }
@@ -115,10 +128,15 @@ export class AccountRepository implements IAccountRepository {
   /**
    * Update account status and publish event atomically using outbox pattern
    */
-  async updateStatusWithEvent(accountId: string, status: AccountStatus, event: CloseAccountEvent, closedAt?: string): Promise<void> {
+  async updateStatusWithEvent(
+    accountId: string,
+    status: AccountStatus,
+    event: CloseAccountEvent,
+    closedAt?: string
+  ): Promise<void> {
     try {
       const now = new Date().toISOString();
-      
+
       // Create outbox item
       const outboxItem: OutboxItem = {
         id: event.id,
@@ -165,7 +183,11 @@ export class AccountRepository implements IAccountRepository {
       });
 
       await this.dynamoClient.send(transactCommand);
-      logger.info('Account status updated atomically with outbox event', { accountId, status, eventId: event.id });
+      logger.info('Account status updated atomically with outbox event', {
+        accountId,
+        status,
+        eventId: event.id
+      });
     } catch (error) {
       logger.error('Error updating account status with outbox event', { error, accountId, status });
       throw error;

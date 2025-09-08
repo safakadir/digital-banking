@@ -1,4 +1,4 @@
-import { SuccessResponse, Account } from '@digital-banking/models';
+import { SuccessResponse } from '@digital-banking/models';
 
 /**
  * Response DTO for create account endpoint

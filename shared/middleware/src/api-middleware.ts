@@ -11,7 +11,7 @@ import { TelemetryBundle } from '@digital-banking/utils';
 /**
  * Common middleware for all API handlers
  * Provides HTTP parsing, error handling, and AWS Lambda Powertools integration
- * 
+ *
  * @param handler - Lambda handler function
  * @param telemetry - Telemetry bundle containing logger, tracer, and metrics
  * @returns Middleware-wrapped handler
@@ -27,5 +27,5 @@ export const commonApiMiddleware = (
     .use(httpErrorHandler())
     .use(captureLambdaHandler(telemetry.tracer))
     .use(injectLambdaContext(telemetry.logger, { clearState: true }))
-    .use(logMetrics(telemetry.metrics, { captureColdStartMetric: true }))
+    .use(logMetrics(telemetry.metrics, { captureColdStartMetric: true }));
 };

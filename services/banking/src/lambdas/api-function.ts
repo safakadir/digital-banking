@@ -15,24 +15,24 @@ export function createApiFunctionHandler(
   bankingService = createBankingService(),
   telemetry = createDefaultTelemetryBundle()
 ) {
-  const { logger } = telemetry;
   return httpRouter([
-  {
-    method: 'POST',
-    path: '/deposit',
-    handler: depositHandler(bankingService, telemetry)
-  },
-  {
-    method: 'POST',
-    path: '/withdraw',
-    handler: withdrawHandler(bankingService, telemetry)
-  },
-  {
-    method: 'GET',
-    path: '/operation-status/{operation_id}',
-    handler: operationHandler(bankingService, telemetry)
-  }
-])};
+    {
+      method: 'POST',
+      path: '/deposit',
+      handler: depositHandler(bankingService, telemetry)
+    },
+    {
+      method: 'POST',
+      path: '/withdraw',
+      handler: withdrawHandler(bankingService, telemetry)
+    },
+    {
+      method: 'GET',
+      path: '/operation-status/{operation_id}',
+      handler: operationHandler(bankingService, telemetry)
+    }
+  ]);
+}
 
 // Export the default handler instance
 export const apiFunctionHandler = createApiFunctionHandler();

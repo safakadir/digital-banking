@@ -1,32 +1,34 @@
-import { commonApiMiddleware, validationMiddleware, errorHandlerMiddleware } from "@digital-banking/middleware";
-import { TelemetryBundle } from "@digital-banking/utils";
-import { CloseAccountResponse } from "../dto";
-import { validateAccountIdParam } from "../validators";
-import { AccountService } from "../account-service";
+import {
+  commonApiMiddleware,
+  validationMiddleware,
+  errorHandlerMiddleware
+} from '@digital-banking/middleware';
+import { TelemetryBundle } from '@digital-banking/utils';
+import { CloseAccountResponse } from '../dto';
+import { validateAccountIdParam } from '../validators';
+import { AccountService } from '../account-service';
 
-export const closeAccountHandler = (
-  accountService: AccountService, 
-  telemetry: TelemetryBundle
-) => commonApiMiddleware(async (event) => {
-  const { logger } = telemetry;
-  const accountId = event.pathParameters?.account_id as string;
-  
-  logger.info('Closing account', { accountId });
-  
-  // Call service layer
-  await accountService.closeAccount(accountId);
-  
-  // Build response DTO
-  const response: CloseAccountResponse = {
-    message: 'Account closed successfully',
-    accountId
-  };
-  
-  // Return success response
-  return {
-    statusCode: 200,
-    body: JSON.stringify(response)
-  };
-}, telemetry)
-  .use(validationMiddleware(validateAccountIdParam, telemetry))
-  .use(errorHandlerMiddleware(telemetry))
+export const closeAccountHandler = (accountService: AccountService, telemetry: TelemetryBundle) =>
+  commonApiMiddleware(async (event) => {
+    const { logger } = telemetry;
+    const accountId = event.pathParameters?.account_id as string;
+
+    logger.info('Closing account', { accountId });
+
+    // Call service layer
+    await accountService.closeAccount(accountId);
+
+    // Build response DTO
+    const response: CloseAccountResponse = {
+      message: 'Account closed successfully',
+      accountId
+    };
+
+    // Return success response
+    return {
+      statusCode: 200,
+      body: JSON.stringify(response)
+    };
+  }, telemetry)
+    .use(validationMiddleware(validateAccountIdParam, telemetry))
+    .use(errorHandlerMiddleware(telemetry));

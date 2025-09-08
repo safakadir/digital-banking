@@ -9,14 +9,14 @@ import { DynamoDBPersistenceLayer } from '@aws-lambda-powertools/idempotency/dyn
 
 // Configure idempotency
 const persistenceStore = new DynamoDBPersistenceLayer({
-  tableName: process.env.IDEMPOTENCY_TABLE || 'LedgerSvc-CommandFn-Idempotency-dev',
+  tableName: process.env.IDEMPOTENCY_TABLE || 'LedgerSvc-CommandFn-Idempotency-dev'
 });
 
 const idempotencyConfig = new IdempotencyConfig({
   // Use message ID as the idempotency key
   eventKeyJmesPath: 'Records[*].body | fromjson(@).id',
   // TTL for idempotency records (24 hours)
-  expiresAfterSeconds: 86400,
+  expiresAfterSeconds: 86400
 });
 
 /**
@@ -24,26 +24,26 @@ const idempotencyConfig = new IdempotencyConfig({
  * @param telemetry - TelemetryBundle instance
  * @returns Command handler function
  */
-export function createCommandFunctionHandler(
-  telemetry = createDefaultTelemetryBundle()
-) {
+export function createCommandFunctionHandler(telemetry = createDefaultTelemetryBundle()) {
   const { logger } = telemetry;
   /**
    * Processes deposit and withdraw commands from SQS
    * Returns batchItemFailures for failed records to enable partial batch processing
    */
 
-  const commandHandler = async (event: SQSEvent): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
+  const commandHandler = async (
+    event: SQSEvent
+  ): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
     logger.info('Processing ledger commands', { recordCount: event.Records.length });
-    
+
     const batchItemFailures: { itemIdentifier: string }[] = [];
-    
+
     for (const record of event.Records) {
       try {
         const message = JSON.parse(record.body) as BankingCommand;
-        logger.info('Processing command', { 
-          messageId: record.messageId, 
-          commandType: message.type, 
+        logger.info('Processing command', {
+          messageId: record.messageId,
+          commandType: message.type,
           messageUuid: message.id
         });
 
@@ -54,26 +54,27 @@ export function createCommandFunctionHandler(
           case 'WITHDRAW_CMD':
             await new WithdrawCommandHandler(telemetry).handle(message);
             break;
-          default:
+          default: {
             // Exhaustive check to ensure all command types are handled
             const _exhaustiveCheck: never = message;
             logger.warn('Unknown command type', { messageType: (message as any).type });
+          }
         }
       } catch (error) {
         logger.error('Error processing record', { error, messageId: record.messageId });
         throw error;
       }
     }
-    
+
     return { batchItemFailures };
   };
-  
+
   // Make the handler idempotent
   const idempotentHandler = makeIdempotent(commandHandler, {
     persistenceStore,
     config: idempotencyConfig
   });
-  
+
   // Return the handler with middleware
   return commonEventMiddleware(idempotentHandler, telemetry);
 }

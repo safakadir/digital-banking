@@ -3,43 +3,41 @@ import { TelemetryBundle } from '@digital-banking/utils';
 import { GetBalanceResponse } from '../../dto';
 import { QueryService } from '../../services';
 
-export const getBalanceHandler = (
-  queryService: QueryService,
-  telemetry: TelemetryBundle
-) => commonApiMiddleware(async (event) => {
-  const { logger } = telemetry;
-  try {
-    const accountId = event.pathParameters?.account_id;
-    if (!accountId) {
+export const getBalanceHandler = (queryService: QueryService, telemetry: TelemetryBundle) =>
+  commonApiMiddleware(async (event) => {
+    const { logger } = telemetry;
+    try {
+      const accountId = event.pathParameters?.account_id;
+      if (!accountId) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ message: 'Account ID is required' })
+        };
+      }
+
+      logger.info('Getting balance', { accountId });
+
+      // Call service layer
+      const result = await queryService.getBalance(accountId);
+
+      // Build response DTO
+      const response: GetBalanceResponse = {
+        accountId: result.accountId,
+        balance: result.balance,
+        currency: 'TRY', // TODO: Get from account details
+        lastUpdated: result.lastUpdated
+      };
+
+      // Return success response
       return {
-        statusCode: 400,
-        body: JSON.stringify({ message: 'Account ID is required' })
+        statusCode: 200,
+        body: JSON.stringify(response)
+      };
+    } catch (error) {
+      logger.error('Error getting balance', { error });
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ message: 'Internal Server Error' })
       };
     }
-    
-    logger.info('Getting balance', { accountId });
-    
-    // Call service layer
-    const result = await queryService.getBalance(accountId);
-    
-    // Build response DTO
-    const response: GetBalanceResponse = {
-      accountId: result.accountId,
-      balance: result.balance,
-      currency: 'TRY', // TODO: Get from account details
-      lastUpdated: result.lastUpdated
-    };
-    
-    // Return success response
-    return {
-      statusCode: 200,
-      body: JSON.stringify(response)
-    };
-  } catch (error) {
-    logger.error('Error getting balance', { error });
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Internal Server Error' })
-    };
-  }
-}, telemetry);
+  }, telemetry);

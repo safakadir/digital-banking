@@ -33,5 +33,10 @@ export interface IAccountRepository {
    * @param event - Close account event
    * @param closedAt - Optional closed timestamp
    */
-  updateStatusWithEvent(accountId: string, status: AccountStatus, event: CloseAccountEvent, closedAt?: string): Promise<void>;
+  updateStatusWithEvent(
+    accountId: string,
+    status: AccountStatus,
+    event: CloseAccountEvent,
+    closedAt?: string
+  ): Promise<void>;
 }

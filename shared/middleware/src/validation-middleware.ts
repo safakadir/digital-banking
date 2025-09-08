@@ -15,10 +15,12 @@ export type Validator = (event: APIGatewayProxyEvent) => void | Promise<void>;
  */
 export const validationMiddleware = (validator: Validator, telemetry: TelemetryBundle) => {
   const { logger } = telemetry;
-  const before: middy.MiddlewareFn<APIGatewayProxyEvent, APIGatewayProxyResult> = async (request) => {
+  const before: middy.MiddlewareFn<APIGatewayProxyEvent, APIGatewayProxyResult> = async (
+    request
+  ) => {
     try {
       await validator(request.event);
-      return; // Explicitly return undefined to continue the middleware chain
+      return;
     } catch (error) {
       if (error instanceof BaseError) {
         logger.warn(`Validation failed: ${error.message}`, { error });
@@ -27,7 +29,7 @@ export const validationMiddleware = (validator: Validator, telemetry: TelemetryB
           body: JSON.stringify({ message: error.message })
         };
       }
-      
+
       logger.error('Unexpected validation error', { error });
       throw error;
     }

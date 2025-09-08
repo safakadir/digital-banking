@@ -13,7 +13,7 @@ import { DynamoDBPersistenceLayer } from '@aws-lambda-powertools/idempotency/dyn
 
 // Configure idempotency
 const persistenceStore = new DynamoDBPersistenceLayer({
-  tableName: process.env.IDEMPOTENCY_TABLE || 'QuerySvc-EventFn-Idempotency-dev',
+  tableName: process.env.IDEMPOTENCY_TABLE || 'QuerySvc-EventFn-Idempotency-dev'
 });
 
 const idempotencyConfig = new IdempotencyConfig({
@@ -27,7 +27,7 @@ const idempotencyConfig = new IdempotencyConfig({
       fromjson(@).id
   `,
   // TTL for idempotency records (24 hours)
-  expiresAfterSeconds: 86400,
+  expiresAfterSeconds: 86400
 });
 
 /**
@@ -48,24 +48,26 @@ export function createEventFunctionHandler(
    * Returns batchItemFailures for failed records to enable partial batch processing
    */
 
-  const eventHandler = async (event: SQSEvent): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
+  const eventHandler = async (
+    event: SQSEvent
+  ): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
     logger.info('Processing query events', { recordCount: event.Records.length });
-    
+
     const batchItemFailures: { itemIdentifier: string }[] = [];
-    
+
     for (const record of event.Records) {
       try {
         // Check if this is an SNS message wrapped in SQS
         const body = JSON.parse(record.body);
-        
+
         // Handle SNS messages wrapped in SQS
         let message: BankingEvent;
         let messageId: string;
-        
+
         if (body.Type === 'Notification') {
           // SNS message format from EventBridge Pipes
           const messageBody = JSON.parse(body.Message);
-          
+
           // Check if this is from outbox table via EventBridge Pipes
           if (messageBody.eventData && messageBody.eventType) {
             // Extract the event data from the outbox format
@@ -81,13 +83,13 @@ export function createEventFunctionHandler(
           message = body as BankingEvent;
           messageId = message.id;
         }
-        
-        logger.info('Processing event', { 
-          sqsMessageId: record.messageId, 
-          eventType: message.type, 
-          messageId: messageId 
+
+        logger.info('Processing event', {
+          sqsMessageId: record.messageId,
+          eventType: message.type,
+          messageId
         });
-        
+
         switch (message.type) {
           case 'DEPOSIT_EVENT':
             await depositEventHandler(queryService, telemetry)(message);
@@ -104,26 +106,27 @@ export function createEventFunctionHandler(
           case 'CLOSE_ACCOUNT_EVENT':
             await closeAccountEventHandler(queryService, telemetry)(message);
             break;
-          default:
+          default: {
             // Exhaustive check to ensure all event types are handled
             const _exhaustiveCheck: never = message;
             logger.warn('Unknown event type', { eventType: (message as any).type });
+          }
         }
       } catch (error) {
         logger.error('Error processing record', { error, messageId: record.messageId });
         throw error;
       }
     }
-    
+
     return { batchItemFailures };
   };
-  
+
   // Make the handler idempotent
   const idempotentHandler = makeIdempotent(eventHandler, {
     persistenceStore,
     config: idempotencyConfig
   });
-  
+
   // Return the handler with middleware
   return commonEventMiddleware(idempotentHandler, telemetry);
 }

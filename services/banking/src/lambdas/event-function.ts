@@ -1,7 +1,14 @@
 import { SQSEvent } from 'aws-lambda';
 import { commonEventMiddleware } from '@digital-banking/middleware';
 import { createDefaultTelemetryBundle } from '@digital-banking/utils';
-import { BankingEvent, CloseAccountEvent, CreateAccountEvent, DepositEvent, WithdrawFailedEvent, WithdrawSuccessEvent } from '@digital-banking/events';
+import {
+  BankingEvent,
+  CloseAccountEvent,
+  CreateAccountEvent,
+  DepositEvent,
+  WithdrawFailedEvent,
+  WithdrawSuccessEvent
+} from '@digital-banking/events';
 import { DepositEventHandler } from '../event/deposit-event-handler';
 import { WithdrawSuccessEventHandler } from '../event/withdraw-success-event-handler';
 import { WithdrawFailedEventHandler } from '../event/withdraw-failed-event-handler';
@@ -13,33 +20,33 @@ import { CloseAccountEventHandler } from '../event/close-account-event-handler';
  * @param telemetry - TelemetryBundle instance
  * @returns Event handler function
  */
-export function createEventFunctionHandler(
-  telemetry = createDefaultTelemetryBundle()
-) {
+export function createEventFunctionHandler(telemetry = createDefaultTelemetryBundle()) {
   const { logger } = telemetry;
   /**
    * Processes events for the Banking service
    * Returns batchItemFailures for failed records to enable partial batch processing
    */
 
-  const eventHandler = async (event: SQSEvent): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
+  const eventHandler = async (
+    event: SQSEvent
+  ): Promise<{ batchItemFailures: { itemIdentifier: string }[] }> => {
     logger.info('Processing banking events', { recordCount: event.Records.length });
-    
+
     const batchItemFailures: { itemIdentifier: string }[] = [];
-    
+
     for (const record of event.Records) {
       try {
         // Check if this is an SNS message wrapped in SQS
         const body = JSON.parse(record.body);
-        
+
         // Handle SNS messages wrapped in SQS
         let message: BankingEvent;
         let messageId: string;
-        
+
         if (body.Type === 'Notification') {
           // SNS message format from EventBridge Pipes
           const messageBody = JSON.parse(body.Message);
-          
+
           // Check if this is from outbox table via EventBridge Pipes
           if (messageBody.eventData && messageBody.eventType) {
             // Extract the event data from the outbox format
@@ -55,19 +62,21 @@ export function createEventFunctionHandler(
           message = body as BankingEvent;
           messageId = message.id;
         }
-        
-        logger.info('Processing event', { 
-          sqsMessageId: record.messageId, 
-          eventType: message.type, 
-          messageId: messageId 
+
+        logger.info('Processing event', {
+          sqsMessageId: record.messageId,
+          eventType: message.type,
+          messageId
         });
-        
+
         switch (message.type) {
           case 'DEPOSIT_EVENT':
             await new DepositEventHandler(telemetry).handle(message as DepositEvent);
             break;
           case 'WITHDRAW_SUCCESS_EVENT':
-            await new WithdrawSuccessEventHandler(telemetry).handle(message as WithdrawSuccessEvent);
+            await new WithdrawSuccessEventHandler(telemetry).handle(
+              message as WithdrawSuccessEvent
+            );
             break;
           case 'WITHDRAW_FAILED_EVENT':
             await new WithdrawFailedEventHandler(telemetry).handle(message as WithdrawFailedEvent);
@@ -78,20 +87,21 @@ export function createEventFunctionHandler(
           case 'CLOSE_ACCOUNT_EVENT':
             await new CloseAccountEventHandler(telemetry).handle(message as CloseAccountEvent);
             break;
-          default:
+          default: {
             // Exhaustive check to ensure all event types are handled
             const _exhaustiveCheck: never = message;
             logger.warn('Unknown event type', { eventType: (message as any).type });
+          }
         }
       } catch (error) {
         logger.error('Error processing record', { error, messageId: record.messageId });
         batchItemFailures.push({ itemIdentifier: record.messageId });
       }
     }
-    
+
     return { batchItemFailures };
   };
-  
+
   // Return the handler with middleware
   // Note: Idempotency is now handled by inbox pattern in business logic
   return commonEventMiddleware(eventHandler, telemetry);
