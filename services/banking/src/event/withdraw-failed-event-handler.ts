@@ -89,12 +89,48 @@ export class WithdrawFailedEventHandler {
       
     } catch (error: any) {
       if (error.name === 'ConditionalCheckFailedException') {
-        // Message already processed or operation not in pending state
-        logger.info('Withdraw failed event already processed or operation not pending, skipping', { 
-          eventId: event.id, 
-          operationId: event.operationId 
+        // Use CancellationReasons to determine which condition failed
+        const cancellationReasons = error.CancellationReasons;
+        
+        // Check if inbox insert failed (item 0) - event already processed
+        if (cancellationReasons && cancellationReasons[0] && cancellationReasons[0].Code === 'ConditionalCheckFailed') {
+          logger.info('Withdraw failed event already processed, skipping', { 
+            eventId: event.id, 
+            operationId: event.operationId,
+            reason: 'Event duplicate - inbox record already exists'
+          });
+          return;
+        }
+        
+        // Check if operation update failed (item 1) - operation not in pending state
+        if (cancellationReasons && cancellationReasons[1] && cancellationReasons[1].Code === 'ConditionalCheckFailed') {
+          logger.warn('Operation not in pending state for withdraw failed event', {
+            eventId: event.id,
+            operationId: event.operationId,
+            reason: 'Operation already completed, failed, or does not exist'
+          });
+          return; // Skip as operation might already be processed or in wrong state
+        }
+        
+        // Check if inbox status update failed (item 2) - status inconsistency
+        if (cancellationReasons && cancellationReasons[2] && cancellationReasons[2].Code === 'ConditionalCheckFailed') {
+          logger.warn('Inbox status update failed - possible race condition', {
+            eventId: event.id,
+            operationId: event.operationId,
+            reason: 'Inbox status not in expected IN_PROGRESS state'
+          });
+          throw error; // Re-throw to trigger retry mechanism
+        }
+        
+        // Fallback for unexpected conditional check failures
+        logger.error('Unexpected conditional check failure', {
+          eventId: event.id,
+          operationId: event.operationId,
+          cancellationReasons: cancellationReasons,
+          error: error.message
         });
-        return;
+        throw error;
+        
       }
       
       logger.error('Error processing withdraw failed event transaction', { 

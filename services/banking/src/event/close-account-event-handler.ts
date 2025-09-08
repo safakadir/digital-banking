@@ -86,14 +86,50 @@ export class CloseAccountEventHandler {
       
     } catch (error: any) {
       if (error.name === 'ConditionalCheckFailedException') {
-        // Message already processed or account doesn't exist
-        logger.info('Close account event already processed or account not found, skipping', { 
-          eventId: event.id, 
-          accountId: event.accountId 
+        // Use CancellationReasons to determine which condition failed
+        const cancellationReasons = error.CancellationReasons;
+        
+        // Check if inbox insert failed (item 0) - event already processed
+        if (cancellationReasons && cancellationReasons[0] && cancellationReasons[0].Code === 'ConditionalCheckFailed') {
+          logger.info('Close account event already processed, skipping', { 
+            eventId: event.id, 
+            accountId: event.accountId,
+            reason: 'Event duplicate - inbox record already exists'
+          });
+          return;
+        }
+        
+        // Check if account update failed (item 1) - account not found
+        if (cancellationReasons && cancellationReasons[1] && cancellationReasons[1].Code === 'ConditionalCheckFailed') {
+          logger.warn('Account not found for close event, skipping', {
+            eventId: event.id,
+            accountId: event.accountId,
+            reason: 'Account does not exist or already closed'
+          });
+          return; // Skip as account might already be closed or doesn't exist
+        }
+        
+        // Check if inbox status update failed (item 2) - status inconsistency
+        if (cancellationReasons && cancellationReasons[2] && cancellationReasons[2].Code === 'ConditionalCheckFailed') {
+          logger.warn('Inbox status update failed - possible race condition', {
+            eventId: event.id,
+            accountId: event.accountId,
+            reason: 'Inbox status not in expected IN_PROGRESS state'
+          });
+          throw error; // Re-throw to trigger retry mechanism
+        }
+        
+        // Fallback for unexpected conditional check failures
+        logger.error('Unexpected conditional check failure', {
+          eventId: event.id,
+          accountId: event.accountId,
+          cancellationReasons: cancellationReasons,
+          error: error.message
         });
-        return;
+        throw error;
+        
       }
-      
+
       logger.error('Error processing close account event transaction', { 
         error, 
         eventId: event.id, 

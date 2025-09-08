@@ -285,14 +285,14 @@ export class WithdrawCommandHandler {
         });
         throw error;
         
-      } else {
-        logger.error('Error processing withdraw command transaction', { 
-          error, 
-          commandId: command.id, 
-          accountId: command.accountId 
-        });
-        throw error;
       }
+
+      logger.error('Error processing withdraw command transaction', { 
+        error, 
+        commandId: command.id, 
+        accountId: command.accountId 
+      });
+      throw error;
     }
   }
 }

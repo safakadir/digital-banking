@@ -83,12 +83,48 @@ export class CreateAccountEventHandler {
       
     } catch (error: any) {
       if (error.name === 'ConditionalCheckFailedException') {
-        // Message already processed
-        logger.info('Create account event already processed, skipping', { 
-          eventId: event.id, 
-          accountId: event.accountId 
+        // Use CancellationReasons to determine which condition failed
+        const cancellationReasons = error.CancellationReasons;
+        
+        // Check if inbox insert failed (item 0) - event already processed
+        if (cancellationReasons && cancellationReasons[0] && cancellationReasons[0].Code === 'ConditionalCheckFailed') {
+          logger.info('Create account event already processed, skipping', { 
+            eventId: event.id, 
+            accountId: event.accountId,
+            reason: 'Event duplicate - inbox record already exists'
+          });
+          return;
+        }
+        
+        // Check if account creation failed (item 1) - this is fine for Put operation
+        if (cancellationReasons && cancellationReasons[1] && cancellationReasons[1].Code === 'ConditionalCheckFailed') {
+          logger.info('Account creation skipped - account already exists', {
+            eventId: event.id,
+            accountId: event.accountId,
+            reason: 'Account already exists in projection'
+          });
+          // Still continue to mark as processed since the end state is correct
+        }
+        
+        // Check if inbox status update failed (item 2) - status inconsistency  
+        if (cancellationReasons && cancellationReasons[2] && cancellationReasons[2].Code === 'ConditionalCheckFailed') {
+          logger.warn('Inbox status update failed - possible race condition', {
+            eventId: event.id,
+            accountId: event.accountId,
+            reason: 'Inbox status not in expected IN_PROGRESS state'
+          });
+          throw error; // Re-throw to trigger retry mechanism
+        }
+        
+        // Fallback for unexpected conditional check failures
+        logger.error('Unexpected conditional check failure', {
+          eventId: event.id,
+          accountId: event.accountId,
+          cancellationReasons: cancellationReasons,
+          error: error.message
         });
-        return;
+        throw error;
+        
       }
       
       logger.error('Error processing create account event transaction', { 
