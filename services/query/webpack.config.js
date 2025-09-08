@@ -18,6 +18,7 @@ export default {
     extensions: ['.ts', '.js'],
     alias: {
       '@digital-banking/commands': path.resolve(__dirname, '../../shared/commands/src'),
+      '@digital-banking/config': path.resolve(__dirname, '../../shared/config/src'),
       '@digital-banking/constants': path.resolve(__dirname, '../../shared/constants/src'),
       '@digital-banking/events': path.resolve(__dirname, '../../shared/events/src'),
       '@digital-banking/middleware': path.resolve(__dirname, '../../shared/middleware/src'),
