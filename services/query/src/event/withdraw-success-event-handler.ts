@@ -2,6 +2,7 @@ import { TelemetryBundle } from '@digital-banking/utils';
 import { WithdrawSuccessEvent } from '@digital-banking/events';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { InboxItem } from '@digital-banking/models';
 
 export class WithdrawSuccessEventHandler {
   private dynamoClient: DynamoDBDocumentClient
@@ -61,22 +62,20 @@ export class WithdrawSuccessEventHandler {
                 accountId: event.accountId,
                 type: 'withdraw',
                 amount: event.amount,
-                balance: event.newBalance,
                 status: 'completed',
                 timestamp: now,
                 description: `Withdrawal of ${event.amount}`
               }
             }
           },
-          // c) Update balance
+          // c) Update balance with atomic decrement (subtract amount from balance)
           {
             Update: {
               TableName: balanceTableName,
               Key: { accountId: event.accountId },
-              UpdateExpression: 'SET balance = :newBalance, lastUpdated = :now',
-              ConditionExpression: 'attribute_exists(accountId)',
+              UpdateExpression: 'ADD balance :negativeAmount SET lastUpdated = :now',
               ExpressionAttributeValues: {
-                ':newBalance': event.newBalance,
+                ':negativeAmount': -event.amount,
                 ':now': now
               }
             }
@@ -90,8 +89,7 @@ export class WithdrawSuccessEventHandler {
         eventId: event.id,
         accountId: event.accountId,
         operationId: event.operationId,
-        amount: event.amount,
-        newBalance: event.newBalance
+        amount: event.amount
       });
     } catch (error: any) {
       if (error.name === 'ConditionalCheckFailedException') {
@@ -128,20 +126,8 @@ export class WithdrawSuccessEventHandler {
           return; // Skip as transaction might already be processed
         }
 
-        // Check if balance update failed (item 2) - balance not found
-        if (
-          cancellationReasons &&
-          cancellationReasons[2] &&
-          cancellationReasons[2].Code === 'ConditionalCheckFailed'
-        ) {
-          logger.warn('Balance not found for withdraw success event', {
-            eventId: event.id,
-            accountId: event.accountId,
-            operationId: event.operationId,
-            reason: 'Account balance does not exist'
-          });
-          return; // Skip as account might not exist or be closed
-        }
+        // Balance update uses ADD operation which doesn't fail for non-existent records
+        // No special handling needed for item 2 (balance update)
 
         // Fallback for unexpected conditional check failures
         logger.error('Unexpected conditional check failure', {
