@@ -27,7 +27,6 @@ export class WithdrawFailedEventHandler {
     });
 
     const now = new Date().toISOString();
-    const ttl = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours TTL
 
     const operationsTableName =
       process.env.OPERATIONS_TABLE_NAME || `BankingSvc-OperationsTable-${process.env.ENV || 'dev'}`;
@@ -77,7 +76,7 @@ export class WithdrawFailedEventHandler {
         reason: event.reason
       });
     } catch (error: any) {
-      if (error.name === 'ConditionalCheckFailedException') {
+      if (error.name === 'TransactionCanceledException') {
         // Use CancellationReasons to determine which condition failed
         const cancellationReasons = error.CancellationReasons;
 

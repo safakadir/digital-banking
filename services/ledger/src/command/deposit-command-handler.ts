@@ -56,7 +56,6 @@ export class DepositCommandHandler {
     });
 
     const now = new Date().toISOString();
-    const ttl = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours TTL
     const transactionId = uuidv4();
 
     // Create journal entries for double-entry bookkeeping
@@ -119,7 +118,7 @@ export class DepositCommandHandler {
             Put: {
               TableName: this.inboxTableName,
               Item: inboxItem,
-              ConditionExpression: 'attribute_not_exists(id)'
+              ConditionExpression: 'attribute_not_exists(messageId)'
             }
           },
           // b) Journal Entry - Debit (External Cash)
@@ -198,7 +197,7 @@ export class DepositCommandHandler {
         journalEntries: [journalEntryDebit.id, journalEntryCredit.id]
       });
     } catch (error: any) {
-      if (error.name === 'ConditionalCheckFailedException') {
+      if (error.name === 'TransactionCanceledException') {
         // Use CancellationReasons to determine which condition failed
         const cancellationReasons = error.CancellationReasons;
 

@@ -114,7 +114,7 @@ export class WithdrawCommandHandler {
             Put: {
               TableName: this.inboxTableName,
               Item: inboxItem,
-              ConditionExpression: 'attribute_not_exists(id)'
+              ConditionExpression: 'attribute_not_exists(messageId)'
             }
           },
           // b) Journal Entry - Debit (Customer Account)
@@ -166,7 +166,7 @@ export class WithdrawCommandHandler {
         journalEntries: [journalEntryDebit.id, journalEntryCredit.id]
       });
     } catch (error: any) {
-      if (error.name === 'ConditionalCheckFailedException') {
+      if (error.name === 'TransactionCanceledException') {
         // Use CancellationReasons to determine which condition failed
         const cancellationReasons = error.CancellationReasons;
 
@@ -252,7 +252,7 @@ export class WithdrawCommandHandler {
             Put: {
               TableName: this.inboxTableName,
               Item: inboxItem,
-              ConditionExpression: 'attribute_not_exists(id)'
+              ConditionExpression: 'attribute_not_exists(messageId)'
             }
           },
           // b) Outbox event for publishing failed event

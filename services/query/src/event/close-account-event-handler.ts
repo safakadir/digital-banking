@@ -26,7 +26,6 @@ export class CloseAccountEventHandler {
     });
 
     const now = new Date().toISOString();
-    const ttl = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours TTL
 
     const accountProjectionTableName = 
       process.env.ACCOUNTS_PROJECTION_TABLE_NAME || 
@@ -73,7 +72,7 @@ export class CloseAccountEventHandler {
         accountId: event.accountId
       });
     } catch (error: any) {
-      if (error.name === 'ConditionalCheckFailedException') {
+      if (error.name === 'TransactionCanceledException') {
         // Use CancellationReasons to determine which condition failed
         const cancellationReasons = error.CancellationReasons;
 

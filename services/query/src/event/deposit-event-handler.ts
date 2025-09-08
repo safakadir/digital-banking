@@ -27,7 +27,6 @@ export class DepositEventHandler {
     });
 
     const now = new Date().toISOString();
-    const ttl = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours TTL
 
     const transactionTableName = 
       process.env.TRANSACTIONS_TABLE_NAME || 
@@ -92,7 +91,7 @@ export class DepositEventHandler {
         amount: event.amount
       });
     } catch (error: any) {
-      if (error.name === 'ConditionalCheckFailedException') {
+      if (error.name === 'TransactionCanceledException') {
         // Use CancellationReasons to determine which condition failed
         const cancellationReasons = error.CancellationReasons;
 
