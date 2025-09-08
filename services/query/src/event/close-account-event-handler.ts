@@ -1,24 +1,156 @@
 import { TelemetryBundle } from '@digital-banking/utils';
 import { CloseAccountEvent } from '@digital-banking/events';
+import { AccountStatus } from '@digital-banking/models';
+import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 
 export class CloseAccountEventHandler {
-  constructor(private readonly telemetry: TelemetryBundle) {}
+  private dynamoClient: DynamoDBDocumentClient
+  private inboxTableName: string;
+
+  constructor(private readonly telemetry: TelemetryBundle) {
+    this.dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient());
+    this.inboxTableName = 
+      process.env.INBOX_TABLE_NAME || `QuerySvc-InboxTable-${process.env.ENV || 'dev'}`;
+  }
 
   /**
-   * Process a close account event
+   * Process a close account event with transaction-based inbox pattern
    */
   async handle(event: CloseAccountEvent): Promise<void> {
     const { logger } = this.telemetry;
 
-    logger.info('Processing close account event', {
+    logger.info('Processing close account event with transaction-based inbox pattern', {
       eventId: event.id,
       accountId: event.accountId
     });
 
-    // TODO: Implement close account event processing logic
-    logger.info('Close account event processing completed', {
-      eventId: event.id,
-      accountId: event.accountId
-    });
+    const now = new Date().toISOString();
+    const ttl = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours TTL
+
+    const accountProjectionTableName = 
+      process.env.ACCOUNT_PROJECTION_TABLE_NAME || 
+      `QuerySvc-AccountProjectionTable-${process.env.ENV || 'dev'}`;
+
+    try {
+      const transactCommand = new TransactWriteCommand({
+        TransactItems: [
+          // a) Inbox insert (IN_PROGRESS)
+          {
+            Put: {
+              TableName: this.inboxTableName,
+              Item: {
+                messageId: event.id,
+                status: 'IN_PROGRESS',
+                createdAt: now,
+                updatedAt: now,
+                ttl
+              },
+              ConditionExpression: 'attribute_not_exists(messageId)'
+            }
+          },
+          // b) Domain state update - Update account status to CLOSED
+          {
+            Update: {
+              TableName: accountProjectionTableName,
+              Key: { accountId: event.accountId },
+              UpdateExpression: 'SET #status = :status',
+              ConditionExpression: 'attribute_exists(accountId)',
+              ExpressionAttributeNames: {
+                '#status': 'status'
+              },
+              ExpressionAttributeValues: {
+                ':status': AccountStatus.CLOSED
+              }
+            }
+          },
+          // c) Inbox status → SUCCESS
+          {
+            Update: {
+              TableName: this.inboxTableName,
+              Key: { messageId: event.id },
+              UpdateExpression: 'SET #status = :success, updatedAt = :now',
+              ConditionExpression: '#status = :inprogress',
+              ExpressionAttributeNames: { '#status': 'status' },
+              ExpressionAttributeValues: {
+                ':success': 'SUCCESS',
+                ':inprogress': 'IN_PROGRESS',
+                ':now': now
+              }
+            }
+          }
+        ]
+      });
+
+      await this.dynamoClient.send(transactCommand);
+
+      logger.info('Close account event processed successfully with transaction', {
+        eventId: event.id,
+        accountId: event.accountId
+      });
+    } catch (error: any) {
+      if (error.name === 'ConditionalCheckFailedException') {
+        // Use CancellationReasons to determine which condition failed
+        const cancellationReasons = error.CancellationReasons;
+
+        // Check if inbox insert failed (item 0) - event already processed
+        if (
+          cancellationReasons &&
+          cancellationReasons[0] &&
+          cancellationReasons[0].Code === 'ConditionalCheckFailed'
+        ) {
+          logger.info('Close account event already processed, skipping', {
+            eventId: event.id,
+            accountId: event.accountId,
+            reason: 'Event duplicate - inbox record already exists'
+          });
+          return;
+        }
+
+        // Check if account update failed (item 1) - account not found
+        if (
+          cancellationReasons &&
+          cancellationReasons[1] &&
+          cancellationReasons[1].Code === 'ConditionalCheckFailed'
+        ) {
+          logger.warn('Account not found for close event, skipping', {
+            eventId: event.id,
+            accountId: event.accountId,
+            reason: 'Account does not exist or already closed'
+          });
+          return; // Skip as account might already be closed or doesn't exist
+        }
+
+        // Check if inbox status update failed (item 2) - status inconsistency
+        if (
+          cancellationReasons &&
+          cancellationReasons[2] &&
+          cancellationReasons[2].Code === 'ConditionalCheckFailed'
+        ) {
+          logger.warn('Inbox status update failed - possible race condition', {
+            eventId: event.id,
+            accountId: event.accountId,
+            reason: 'Inbox status not in expected IN_PROGRESS state'
+          });
+          throw error; // Re-throw to trigger retry mechanism
+        }
+
+        // Fallback for unexpected conditional check failures
+        logger.error('Unexpected conditional check failure', {
+          eventId: event.id,
+          accountId: event.accountId,
+          cancellationReasons,
+          error: error.message
+        });
+        throw error;
+      }
+
+      logger.error('Error processing close account event transaction', {
+        error,
+        eventId: event.id,
+        accountId: event.accountId
+      });
+      throw error;
+    }
   }
 }

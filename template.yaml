@@ -210,11 +210,22 @@ Resources:
           AttributeType: S
         - AttributeName: account_id
           AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
       KeySchema:
         - AttributeName: account_id
           KeyType: HASH
         - AttributeName: id
           KeyType: RANGE
+      LocalSecondaryIndexes:
+        - IndexName: account-timestamp-lsi
+          KeySchema:
+            - AttributeName: account_id
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
 
   QuerySvcBalancesTable:
     Type: AWS::DynamoDB::Table
