@@ -65,7 +65,7 @@ aws cognito-idp initiate-auth \
 
 Get `IdToken` from the response and use it as *Bearer Token* in `Authorization` header of API requests.
 
-### API Endpoinst
+### API Endpoints
 
 Accounts
 - `POST /accounts` - Create new account
@@ -83,7 +83,7 @@ Query Operations
 - `GET /balances/{account_id}` - Get account balance
 - `GET /balances` - Get all user account balances
 
-Find detailed descriptions in [Openapi Spec file](./docs/api-contract.yaml).
+Find detailed descriptions in [Openapi Spec file](./docs/openapi.yaml).
 
 
 ## Architecture
@@ -106,7 +106,26 @@ This project follows an event-driven microservices architecture with the followi
 | **Ledger Service** | `DEPOSIT_CMD`<br>`WITHDRAW_CMD` | N/A | `DEPOSIT_EVENT`<br>`WITHDRAW_SUCCESS_EVENT`<br>`WITHDRAW_FAILED_EVENT` | N/A |
 | **Query Service** | N/A | N/A | N/A | `DEPOSIT_EVENT`<br>`WITHDRAW_SUCCESS_EVENT`<br>`CREATE_ACCOUNT_EVENT`<br>`CLOSE_ACCOUNT_EVENT` |
 
-### Architectural Notes 
+### Database Tables
+
+|Service | Table | Description |
+|---------|---------|----------------|
+| **Accounts** | `AccountsSvc-AccountsTable` | Accounts table for storing detailed information about accounts |
+| **Accounts** | `AccountsSvc-OutboxTable` | Outbox table for storing outgoing events |
+| **Banking** | `BankingSvc-OperationsTable` | Operations table for storing banking operations |
+| **Banking** | `BankingSvc-AccountsProjectionTable` | Projection table of accounts to validate user-account association |
+| **Banking** | `BankingSvc-InboxTable` | Inbox table for message deduplication |
+| **Banking** | `BankingSvc-OutboxTable` | Outbox table for storing outgoing events |
+| **Ledger** | `LedgerSvc-LedgerTable` | Ledger table for storing transactions |
+| **Ledger** | `LedgerSvc-BalanceTable` | Balance table for storing balances, used for negative balance checks |
+| **Ledger** | `LedgerSvc-InboxTable` | Inbox table for message deduplication |
+| **Ledger** | `LedgerSvc-OutboxTable` | Outbox table for storing outgoing events |
+| **Query** | `QuerySvc-TransactionsTable` | Transactions table for storing transactions |
+| **Query** | `QuerySvc-BalancesTable` | Balances table for storing balances |
+| **Query** | `QuerySvc-AccountsProjectionTable` | Projection table of accounts to validate user-account association |
+| **Query** | `QuerySvc-InboxTable` | Inbox table for message deduplication |
+
+### Design Notes 
 
 - Message(Event/Command) handling and API request handling are **separated**.
 - **Outbox pattern** used to not loose messages.
@@ -123,7 +142,7 @@ This project follows an event-driven microservices architecture with the followi
 - `/lambdas` folders are **entry layer** for all services. Then lambda events (api or event/command) are routed to their respective handlers.
   - `/api` folder is **n-tier architecture** for handling **API requests**.
   - `/event` or `/command` folder is **event/command handling** layer. Then message handlers are responsible for domain operations and writing to outbox.
-  - Because of the nature and limitations of **DynamoDB transactions**, a **database driven architecture** is used in event/command handlers out of necessity.
+    - Because of the nature and limitations of **DynamoDB transactions**, a **database driven architecture** is used in event/command handlers out of necessity.
 
 
 ## Technologies Used
