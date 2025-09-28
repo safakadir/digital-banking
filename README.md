@@ -52,15 +52,15 @@ sam local start-api
 
 ## Demo
 
-Live at: https://mfwz73pfc3.execute-api.eu-central-1.amazonaws.com/dev
+*Demo deployment has been deleted.*
 
 ### Get Authenticated
 
 ```bash
 aws cognito-idp initiate-auth \
-  --client-id 6be0cg2ppovecf7bu6ed5nttbc \
+  --client-id <client_id> \
   --auth-flow USER_PASSWORD_AUTH \
-  --auth-parameters USERNAME=test@mail.com,PASSWORD=Aa123456
+  --auth-parameters USERNAME=<email>,PASSWORD=<password>
 ```
 
 Get `IdToken` from the response and use it as *Bearer Token* in `Authorization` header of API requests.
